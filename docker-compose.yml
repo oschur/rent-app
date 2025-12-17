@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: 'postgres:18'
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: users
+    ports:
+      - "5435:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql
+volumes:
+  pgdata:
