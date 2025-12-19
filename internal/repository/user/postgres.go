@@ -21,7 +21,7 @@ func (p *PostgresRepo) InsertUser(u *domain.User) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	stmt := `
-		INSERT INTO users (email, first_name, last_name, passwordhash, is_landlord, is_admin, created_at, updated_at)
+		INSERT INTO users (email, first_name, last_name, password_hash, is_landlord, is_admin, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING id
 	`
@@ -180,7 +180,7 @@ func (p *PostgresRepo) ResetPassword(id int, password string) error {
 		return err
 	}
 
-	stmt := `UPDATE users SET passwordhash = $1 WHERE id = $2`
+	stmt := `UPDATE users SET password_hash = $1 WHERE id = $2`
 
 	result, err := p.DB.Exec(ctx, stmt, passwordHash, id)
 
