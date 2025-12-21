@@ -107,9 +107,8 @@ func TestGetUserByID(t *testing.T) {
 	user := createTestUser()
 
 	_ = repo.InsertUser(user)
-	id := user.ID
 
-	_, err := repo.GetUserByID(id)
+	_, err := repo.GetUserByID(user.ID)
 	if err != nil {
 		t.Errorf("expected getting user but got err %s", err)
 	}
@@ -120,11 +119,43 @@ func TestGetUserByID(t *testing.T) {
 	}
 }
 
+func TestGelAllUsers(t *testing.T) {
+	repo := setupTestDB(t)
+	defer repo.DB.Close()
+
+	users, err := repo.GetAllUsers()
+	if err != nil {
+		t.Error("unexpected error:", err)
+	}
+
+	if len(users) != 0 {
+		t.Errorf("error getting quantity of users: expected 0 but got %d", len(users))
+	}
+
+	user := createTestUser()
+	_ = repo.InsertUser(user)
+
+	users, err = repo.GetAllUsers()
+	if err != nil {
+		t.Error("unexpected error:", err)
+	}
+
+	if len(users) != 1 {
+		t.Errorf("error getting quantity of users: expected 1 but got %d", len(users))
+	}
+}
+
 func TestUpdateUser(t *testing.T) {
 	repo := setupTestDB(t)
 	defer repo.DB.Close()
 
 	user := createTestUser()
+
+	err := repo.UpdateUser(user)
+	if err == nil {
+		t.Errorf("expected error but don't get it")
+	}
+
 	_ = repo.InsertUser(user)
 
 	user.Email = "another@email.fr"
@@ -133,7 +164,7 @@ func TestUpdateUser(t *testing.T) {
 	user.IsAdmin = true
 	user.IsLandlord = true
 
-	err := repo.UpdateUser(user)
+	err = repo.UpdateUser(user)
 	if err != nil {
 		t.Error("got err but should not:", err)
 	}

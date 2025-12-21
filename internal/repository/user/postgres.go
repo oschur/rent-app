@@ -120,6 +120,51 @@ func (p *PostgresRepo) GetUserByID(id int) (*domain.User, error) {
 	return &user, nil
 }
 
+func (p *PostgresRepo) GetAllUsers() ([]*domain.User, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	query := `
+		SELECT 
+			u.id, u.email, u.first_name, u.last_name, u.password_hash, u.is_landlord, u.is_admin, u.created_at, u.updated_at
+		FROM 
+			users u
+		ORDER BY u.id
+	`
+
+	rows, err := p.DB.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []*domain.User
+	for rows.Next() {
+		var user domain.User
+		err := rows.Scan(
+			&user.ID,
+			&user.Email,
+			&user.FirstName,
+			&user.LastName,
+			&user.PasswordHash,
+			&user.IsLandlord,
+			&user.IsAdmin,
+			&user.CreatedAt,
+			&user.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, &user)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return users, nil
+}
+
 func (p *PostgresRepo) UpdateUser(u *domain.User) error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
