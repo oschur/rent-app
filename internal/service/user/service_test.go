@@ -338,6 +338,78 @@ func TestService_GetUserByID(t *testing.T) {
 	}
 }
 
+func TestService_GetUserByEmail(t *testing.T) {
+	tests := []struct {
+		name          string
+		userID        int
+		email         string
+		setupMock     func(*MockRepository)
+		expectError   bool
+		expectErrType error
+		validate      func(*testing.T, *domain.User)
+	}{
+		{
+			name:   "successful get",
+			userID: 1,
+			email:  "test@example.com",
+			setupMock: func(m *MockRepository) {
+				user := &domain.User{
+					ID:           1,
+					Email:        "test@example.com",
+					FirstName:    "George",
+					LastName:     "Washington",
+					PasswordHash: "hashed_password",
+				}
+				m.users[1] = user
+				m.usersByEmail["test@example.com"] = user
+			},
+			expectError: false,
+			validate: func(t *testing.T, u *domain.User) {
+				if u.Email != "test@example.com" {
+					t.Errorf("expected test@example.com email but got %s", u.Email)
+				}
+				if u.PasswordHash != "" {
+					t.Error("expected password hash to be cleared")
+				}
+			},
+		},
+		{
+			name:   "user not found",
+			userID: 4,
+			setupMock: func(m *MockRepository) {
+				m.getByEmailErr = errors.New("user not found")
+			},
+			expectError: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mockRepo := NewMockRepository()
+			test.setupMock(mockRepo)
+			service := NewService(mockRepo)
+
+			user, err := service.GetUserByEmail(test.email)
+
+			if test.expectError {
+				if err == nil {
+					t.Fatal("expected error but got nil")
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("unexpected error: %s", err)
+				}
+				if user == nil {
+					t.Fatal("expected user but got nil")
+				}
+				if test.validate != nil {
+					test.validate(t, user)
+				}
+			}
+		})
+	}
+}
+
 func TestService_GetAllUsers(t *testing.T) {
 	tests := []struct {
 		name        string
