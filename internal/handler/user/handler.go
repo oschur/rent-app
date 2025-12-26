@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	domain "rent-app/internal/domain/user"
 	"rent-app/internal/service/user"
 	"strconv"
 
@@ -11,10 +12,10 @@ import (
 )
 
 type Handler struct {
-	service *user.Service
+	service domain.Service
 }
 
-func NewHandler(service *user.Service) *Handler {
+func NewHandler(service domain.Service) *Handler {
 	return &Handler{
 		service: service,
 	}
@@ -106,6 +107,10 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, user.ErrEmailAlreadyTaken) {
 			respondError(w, http.StatusConflict, "email already taken")
+			return
+		}
+		if errors.Is(err, user.ErrUserNotFound) {
+			respondError(w, http.StatusNotFound, "user not found")
 			return
 		}
 		respondError(w, http.StatusInternalServerError, "failed to update user")
