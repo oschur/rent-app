@@ -17,6 +17,12 @@ type PostgresRepo struct {
 	DB *pgxpool.Pool
 }
 
+func NewPostgresRepo(db *pgxpool.Pool) *PostgresRepo {
+	return &PostgresRepo{
+		DB: db,
+	}
+}
+
 func (p *PostgresRepo) InsertUser(u *domain.User) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
