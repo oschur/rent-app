@@ -54,7 +54,7 @@ type LoginResponse struct {
 }
 
 const (
-	AccessTokenTTL  = 24 * time.Hour
+	AccessTokenTTL  = 2 * time.Hour
 	RefreshTokenTTL = 30 * 24 * time.Hour
 	TokenType       = "Bearer"
 )
