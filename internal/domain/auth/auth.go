@@ -71,3 +71,7 @@ func SetUserContext(ctx context.Context, claims *AccessTokenClaims) context.Cont
 	}
 	return contextUserInfo.SetUserInfo(ctx, userInfo)
 }
+
+func GetUserFromContext(ctx context.Context) *contextUserInfo.UserInfo {
+	return contextUserInfo.GetUserInfo(ctx)
+}
