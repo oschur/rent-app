@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	userContext "rent-app/internal/context"
 	domain "rent-app/internal/domain/user"
 	"rent-app/internal/service/user"
 	"strconv"
@@ -48,12 +49,20 @@ type ErrorResponse struct {
 
 // метод POST(не PUT т.к. операция не идемпотентная)
 // кладем в /api/users
+// доступно без аутентификации, но обычные пользователи не могут создавать админов
 func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	var req CreateUserRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "bad request")
 		return
+	}
+
+	userInfo := userContext.GetUserInfo(r.Context())
+
+	// админа может создать только админ
+	if userInfo == nil || !userInfo.IsAdmin {
+		req.IsAdmin = false
 	}
 
 	u, err := h.service.CreateUser(
@@ -74,6 +83,7 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		respondError(w, http.StatusInternalServerError, "failed to create user")
+		return
 	}
 
 	respondJSON(w, http.StatusCreated, u)
@@ -82,10 +92,22 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 // тут нужен метод PUT т.к. эта операция идемпотентная
 // кладем в /api/users/{id}
 func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
+	userInfo := userContext.GetUserInfo(r.Context())
+	if userInfo == nil {
+		respondError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "invalid user ID")
+		return
+	}
+
+	// обычный пользователь может обновлять только себя
+	if !userInfo.IsAdmin && userInfo.UserID != id {
+		respondError(w, http.StatusForbidden, "you can only update your own profile")
 		return
 	}
 
@@ -94,6 +116,10 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "bad request")
 		return
+	}
+
+	if !userInfo.IsAdmin {
+		req.IsAdmin = nil
 	}
 
 	u, err := h.service.UpdateUser(
@@ -122,10 +148,21 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 
 // кладем в /api/users/{id}
 func (h *Handler) GetUserByID(w http.ResponseWriter, r *http.Request) {
+	userInfo := userContext.GetUserInfo(r.Context())
+	if userInfo == nil {
+		respondError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "invalid user ID")
+		return
+	}
+
+	if !userInfo.IsAdmin {
+		respondError(w, http.StatusForbidden, "admin access required")
 		return
 	}
 
@@ -144,6 +181,17 @@ func (h *Handler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 
 // кладем в /api/users/{email}
 func (h *Handler) GetUserByEmail(w http.ResponseWriter, r *http.Request) {
+	userInfo := userContext.GetUserInfo(r.Context())
+	if userInfo == nil {
+		respondError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
+	if !userInfo.IsAdmin {
+		respondError(w, http.StatusForbidden, "admin access required")
+		return
+	}
+
 	email := chi.URLParam(r, "email")
 	if email == "" {
 		respondError(w, http.StatusBadRequest, "email parameter is required")
@@ -165,6 +213,17 @@ func (h *Handler) GetUserByEmail(w http.ResponseWriter, r *http.Request) {
 
 // кладем в /api/users
 func (h *Handler) GetAllUsers(w http.ResponseWriter, r *http.Request) {
+	userInfo := userContext.GetUserInfo(r.Context())
+	if userInfo == nil {
+		respondError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
+	if !userInfo.IsAdmin {
+		respondError(w, http.StatusForbidden, "admin access required")
+		return
+	}
+
 	users, err := h.service.GetAllUsers()
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "failed to get users")
@@ -177,10 +236,22 @@ func (h *Handler) GetAllUsers(w http.ResponseWriter, r *http.Request) {
 // метод POST
 // кладем в /api/users/{id}/reset-password
 func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	userInfo := userContext.GetUserInfo(r.Context())
+	if userInfo == nil {
+		respondError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "invalid user ID")
+		return
+	}
+
+	// пользователь может сбросить только свой пароль
+	if userInfo.UserID != id {
+		respondError(w, http.StatusForbidden, "you can only reset your own password")
 		return
 	}
 
@@ -211,10 +282,22 @@ func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 // метод DELETE
 // кладем в /api/users/{id}
 func (h *Handler) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	userInfo := userContext.GetUserInfo(r.Context())
+	if userInfo == nil {
+		respondError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "invalid user ID")
+		return
+	}
+
+	// обычный пользователь может удалить только себя
+	if !userInfo.IsAdmin && userInfo.UserID != id {
+		respondError(w, http.StatusForbidden, "you can only delete your own account")
 		return
 	}
 

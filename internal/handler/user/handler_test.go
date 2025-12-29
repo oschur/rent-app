@@ -7,8 +7,10 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	userContext "rent-app/internal/context"
 	domain "rent-app/internal/domain/user"
 	"rent-app/internal/service/user"
+	"strconv"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -267,6 +269,7 @@ func TestUserHandler_GetUserByID(t *testing.T) {
 			rctx := chi.NewRouteContext()
 			rctx.URLParams.Add("id", e.userID)
 			r = r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
+			r = withAdminUser(r)
 
 			rr := httptest.NewRecorder()
 
@@ -356,6 +359,7 @@ func TestUserHandler_GetUserByEmail(t *testing.T) {
 			rctx := chi.NewRouteContext()
 			rctx.URLParams.Add("email", e.userEmail)
 			r = r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
+			r = withAdminUser(r)
 
 			rr := httptest.NewRecorder()
 
@@ -415,6 +419,7 @@ func TestUserHandler_GetAllUsers(t *testing.T) {
 	for _, e := range tests {
 		t.Run(e.name, func(t *testing.T) {
 			r := httptest.NewRequest(http.MethodGet, "/api/users", nil)
+			r = withAdminUser(r)
 			rr := httptest.NewRecorder()
 
 			handler := NewHandler(e.mockService)
@@ -548,6 +553,7 @@ func TestUserHandler_UpdateUser(t *testing.T) {
 			rctx := chi.NewRouteContext()
 			rctx.URLParams.Add("id", e.userID)
 			r = r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
+			r = withAdminUser(r)
 
 			rr := httptest.NewRecorder()
 			handler := NewHandler(e.mockService)
@@ -616,6 +622,7 @@ func TestUserHandler_DeleteUser(t *testing.T) {
 			rctx := chi.NewRouteContext()
 			rctx.URLParams.Add("id", e.userID)
 			r = r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
+			r = withAdminUser(r)
 
 			rr := httptest.NewRecorder()
 			handler := NewHandler(e.mockService)
@@ -650,17 +657,17 @@ func TestUserHandler_ResetPassword(t *testing.T) {
 			expectedStatus: http.StatusNoContent,
 		},
 		{
-			name:        "invalid ID",
-			userID:      "invalid",
-			requestBody: jsonBytes(ResetPasswordRequest{Password: "newpass"}),
-			mockService: &MockService{},
+			name:           "invalid ID",
+			userID:         "invalid",
+			requestBody:    jsonBytes(ResetPasswordRequest{Password: "newpass"}),
+			mockService:    &MockService{},
 			expectedStatus: http.StatusBadRequest,
 		},
 		{
-			name:        "invalid JSON",
-			userID:      "1",
-			requestBody: []byte("invalid json"),
-			mockService: &MockService{},
+			name:           "invalid JSON",
+			userID:         "1",
+			requestBody:    []byte("invalid json"),
+			mockService:    &MockService{},
 			expectedStatus: http.StatusBadRequest,
 		},
 		{
@@ -713,7 +720,8 @@ func TestUserHandler_ResetPassword(t *testing.T) {
 			rctx := chi.NewRouteContext()
 			rctx.URLParams.Add("id", e.userID)
 			r = r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
-
+			uID, _ := strconv.Atoi(e.userID)
+			r = withRegularUser(r, uID)
 			rr := httptest.NewRecorder()
 			handler := NewHandler(e.mockService)
 			handler.ResetPassword(rr, r)
@@ -725,7 +733,25 @@ func TestUserHandler_ResetPassword(t *testing.T) {
 	}
 }
 
-// вспомогательная функция
+// вспомогательные функции
 func stringPtr(s string) *string {
 	return &s
+}
+
+func withAdminUser(r *http.Request) *http.Request {
+	userInfo := &userContext.UserInfo{
+		UserID:     1,
+		IsLandlord: false,
+		IsAdmin:    true,
+	}
+	return r.WithContext(userContext.SetUserInfo(r.Context(), userInfo))
+}
+
+func withRegularUser(r *http.Request, userID int) *http.Request {
+	userInfo := &userContext.UserInfo{
+		UserID:     userID,
+		IsLandlord: false,
+		IsAdmin:    false,
+	}
+	return r.WithContext(userContext.SetUserInfo(r.Context(), userInfo))
 }
