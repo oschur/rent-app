@@ -24,7 +24,7 @@ func setupTestDB(t *testing.T) *PostgresRepo {
 			owner_id INT NOT NULL,
 			status VARCHAR(64) NOT NULL,
 			price_unit VARCHAR(64) NOT NULL,
-			title TEXT NOT NULL,
+			title TEXT,
 			price INT NOT NULL,
 			country VARCHAR(64) NOT NULL,
 			city VARCHAR(64) NOT NULL,
