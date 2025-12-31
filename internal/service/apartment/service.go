@@ -106,8 +106,8 @@ func (s *Service) GetApartmentByOwnerID(ownerID int) ([]*domain.Apartment, error
 	return apartments, nil
 }
 
-func (s *Service) GetAllApartments() ([]*domain.Apartment, error) {
-	apartments, err := s.repo.GetAllApartments()
+func (s *Service) GetAllApartments(filters *domain.ApartmentFilters) ([]*domain.Apartment, error) {
+	apartments, err := s.repo.GetAllApartments(filters)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get apartments: %w", err)
 	}

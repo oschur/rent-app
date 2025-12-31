@@ -64,12 +64,35 @@ func (m *MockRepository) GetApartmentsByOwnerID(ownerID int) ([]*domain.Apartmen
 	return result, nil
 }
 
-func (m *MockRepository) GetAllApartments() ([]*domain.Apartment, error) {
+func (m *MockRepository) GetAllApartments(filters *domain.ApartmentFilters) ([]*domain.Apartment, error) {
 	if m.getAllError != nil {
 		return nil, m.getAllError
 	}
 	var result []*domain.Apartment
 	for _, apt := range m.apartments {
+		if filters != nil {
+			if filters.Country != nil && apt.Country != *filters.Country {
+				continue
+			}
+			if filters.City != nil && apt.City != *filters.City {
+				continue
+			}
+			if filters.MinAreaM2 != nil && apt.AreaM2 < *filters.MinAreaM2 {
+				continue
+			}
+			if filters.MaxAreaM2 != nil && apt.AreaM2 > *filters.MaxAreaM2 {
+				continue
+			}
+			if filters.Rooms != nil && apt.Rooms != *filters.Rooms {
+				continue
+			}
+			if filters.Floor != nil && (apt.Floor == nil || *apt.Floor != *filters.Floor) {
+				continue
+			}
+			if filters.PetsAllowed != nil && apt.PetsAllowed != *filters.PetsAllowed {
+				continue
+			}
+		}
 		result = append(result, apt)
 	}
 	return result, nil
@@ -562,7 +585,7 @@ func TestService_GetAllApartments(t *testing.T) {
 	_, _ = service.CreateApartment(req2)
 
 	t.Run("successful get all", func(t *testing.T) {
-		apartments, err := service.GetAllApartments()
+		apartments, err := service.GetAllApartments(nil)
 		if err != nil {
 			t.Errorf("GetAllApartments error %v, expected nil", err)
 			return
@@ -573,12 +596,34 @@ func TestService_GetAllApartments(t *testing.T) {
 		}
 	})
 
+	t.Run("successful get all with filters", func(t *testing.T) {
+		country := "US"
+		city := "NYC"
+		filters := &domain.ApartmentFilters{
+			Country: &country,
+			City:    &city,
+		}
+		apartments, err := service.GetAllApartments(filters)
+		if err != nil {
+			t.Errorf("GetAllApartments error %v, expected nil", err)
+			return
+		}
+
+		if len(apartments) != 1 {
+			t.Errorf("expected 1 apartment, got %d", len(apartments))
+		}
+
+		if apartments[0].City != "NYC" {
+			t.Errorf("expected city NYC, got %s", apartments[0].City)
+		}
+	})
+
 	t.Run("repository error", func(t *testing.T) {
 		mockRepo := NewMockRepository()
 		mockRepo.getAllError = errors.New("database error")
 		service := NewService(mockRepo)
 
-		_, err := service.GetAllApartments()
+		_, err := service.GetAllApartments(nil)
 		if err == nil {
 			t.Error("GetAllApartments expected error, got nil")
 		}

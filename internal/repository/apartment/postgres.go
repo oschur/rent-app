@@ -3,10 +3,12 @@ package apartment
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	domain "rent-app/internal/domain/apartment"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -54,7 +56,6 @@ func (p *PostgresRepo) InsertApartment(a *domain.Apartment) error {
 		now,
 		now,
 	).Scan(&id)
-
 	if err != nil {
 		return fmt.Errorf("failed to insert apartment: %w", err)
 	}
@@ -101,7 +102,6 @@ func (p *PostgresRepo) GetApartmentByID(id int) (*domain.Apartment, error) {
 		&apartment.CreatedAt,
 		&apartment.UpdatedAt,
 	)
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to get apartment by id: %w", err)
 	}
@@ -172,7 +172,7 @@ func (p *PostgresRepo) GetApartmentsByOwnerID(ownerID int) ([]*domain.Apartment,
 	return apartments, nil
 }
 
-func (p *PostgresRepo) GetAllApartments() ([]*domain.Apartment, error) {
+func (p *PostgresRepo) GetAllApartments(filters *domain.ApartmentFilters) ([]*domain.Apartment, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -182,10 +182,56 @@ func (p *PostgresRepo) GetAllApartments() ([]*domain.Apartment, error) {
 			area_m2, rooms, floor, total_floors, pets_allowed, created_at, updated_at
 		FROM 
 			apartments
-		ORDER BY created_at DESC
 	`
 
-	rows, err := p.DB.Query(ctx, query)
+	conditions := []string{}
+	args := []any{}
+	argPos := 1
+
+	if filters != nil {
+		if filters.Country != nil {
+			conditions = append(conditions, fmt.Sprintf("country = $%d", argPos))
+			args = append(args, *filters.Country)
+			argPos++
+		}
+		if filters.City != nil {
+			conditions = append(conditions, fmt.Sprintf("city = $%d", argPos))
+			args = append(args, *filters.City)
+			argPos++
+		}
+		if filters.MinAreaM2 != nil {
+			conditions = append(conditions, fmt.Sprintf("area_m2 >= $%d", argPos))
+			args = append(args, *filters.MinAreaM2)
+			argPos++
+		}
+		if filters.MaxAreaM2 != nil {
+			conditions = append(conditions, fmt.Sprintf("area_m2 <= $%d", argPos))
+			args = append(args, *filters.MaxAreaM2)
+			argPos++
+		}
+		if filters.Rooms != nil {
+			conditions = append(conditions, fmt.Sprintf("rooms = $%d", argPos))
+			args = append(args, *filters.Rooms)
+			argPos++
+		}
+		if filters.Floor != nil {
+			conditions = append(conditions, fmt.Sprintf("floor = $%d", argPos))
+			args = append(args, *filters.Floor)
+			argPos++
+		}
+		if filters.PetsAllowed != nil {
+			conditions = append(conditions, fmt.Sprintf("pets_allowed = $%d", argPos))
+			args = append(args, *filters.PetsAllowed)
+			argPos++
+		}
+	}
+	if len(conditions) > 0 {
+		query += " WHERE " + strings.Join(conditions, " AND ")
+	}
+	query += " ORDER BY created_at DESC"
+
+	var rows pgx.Rows
+	rows, err := p.DB.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all apartments: %w", err)
 	}
@@ -269,7 +315,6 @@ func (p *PostgresRepo) UpdateApartment(a *domain.Apartment) error {
 		time.Now(),
 		a.ID,
 	)
-
 	if err != nil {
 		return fmt.Errorf("failed to update apartment: %w", err)
 	}

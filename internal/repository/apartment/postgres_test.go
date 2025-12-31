@@ -152,7 +152,7 @@ func TestGetAllApartments(t *testing.T) {
 	_ = repo.InsertApartment(apartment1)
 	_ = repo.InsertApartment(apartment2)
 
-	found, err := repo.GetAllApartments()
+	found, err := repo.GetAllApartments(nil)
 	if err != nil {
 		t.Errorf("expected getting apartments but got err %s", err)
 	}
