@@ -8,5 +8,8 @@ type ApartmentFilters struct {
 	Rooms       *int
 	Floor       *int
 	PetsAllowed *bool
+	MinPrice    *int
+	MaxPrice    *int
 }
+
 

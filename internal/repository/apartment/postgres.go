@@ -224,6 +224,16 @@ func (p *PostgresRepo) GetAllApartments(filters *domain.ApartmentFilters) ([]*do
 			args = append(args, *filters.PetsAllowed)
 			argPos++
 		}
+		if filters.MinPrice != nil {
+			conditions = append(conditions, fmt.Sprintf("price >= $%d", argPos))
+			args = append(args, *filters.MinPrice)
+			argPos++
+		}
+		if filters.MaxPrice != nil {
+			conditions = append(conditions, fmt.Sprintf("price <= $%d", argPos))
+			args = append(args, *filters.MaxPrice)
+			argPos++
+		}
 	}
 	if len(conditions) > 0 {
 		query += " WHERE " + strings.Join(conditions, " AND ")
