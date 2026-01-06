@@ -9,7 +9,7 @@ BEGIN
     IF NOT admin_exists THEN
         INSERT INTO users (email, first_name, last_name, password_hash, is_landlord, is_admin, created_at, updated_at)
         VALUES (
-            'admin@rentapp.com',
+            'admin@test.com',
             'Admin',
             'User',
             '$2a$12$lirb43ksbqPL/mLOSGmCMOnrJQWtDeeWl.frct8xnueZd5dX1suwW', -- bcrypt hash для 'admin123'
