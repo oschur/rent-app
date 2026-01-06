@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/url"
 	userContext "rent-app/internal/context"
 	domain "rent-app/internal/domain/user"
 	"rent-app/internal/service/user"
@@ -239,10 +240,16 @@ func (h *Handler) GetUserByEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	email := chi.URLParam(r, "email")
-	if email == "" {
+	emailParam := chi.URLParam(r, "email")
+	if emailParam == "" {
 		respondError(w, http.StatusBadRequest, "email parameter is required")
 		return
+	}
+
+	// приводим email%40example.com к email@example.com
+	email, err := url.PathUnescape(emailParam)
+	if err != nil {
+		email = emailParam
 	}
 
 	u, err := h.service.GetUserByEmail(email)
