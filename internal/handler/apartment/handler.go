@@ -56,9 +56,20 @@ type ErrorResponse struct {
 	Error string `json:"error"`
 }
 
-// метод POST
-// кладем в /api/apartments
-// может только landlord или admin, владелец квартиры устанавливается из контекста
+// CreateApartment godoc
+// @Summary      Создание квартиры
+// @Description  Создание новой квартиры. Доступно только для арендодателей и администраторов. Допустимые status: "active", "archived", "blocked". Допустимые price unit: "pernight", "permonth". Floor не может быть больше Totatfloors. Если установлен TotalFloors, Floor должен быть установлен, и наоборот. Все численные значения должны быть больше либо равны нулю.
+// @Tags         apartments
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        request  body      CreateApartmentRequest  true  "Данные квартиры"
+// @Success      201      {object}  domain.Apartment
+// @Failure      400      {object}  ErrorResponse  "Неверный запрос"
+// @Failure      401      {object}  ErrorResponse  "Требуется аутентификация"
+// @Failure      403      {object}  ErrorResponse  "Доступ запрещен"
+// @Failure      500      {object}  ErrorResponse  "Внутренняя ошибка сервера"
+// @Router       /api/apartments [post]
 func (h *Handler) CreateApartment(w http.ResponseWriter, r *http.Request) {
 	userInfo := userContext.GetUserInfo(r.Context())
 	if userInfo == nil {
@@ -110,7 +121,18 @@ func (h *Handler) CreateApartment(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusCreated, apt)
 }
 
-// кладем в /api/apartments/{id}
+// GetApartmentByID godoc
+// @Summary      Получение квартиры по ID
+// @Description  Получение информации о квартире по ID. Доступно для всех аутентифицированных пользователей.
+// @Tags         apartments
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      int  true  "ID квартиры"
+// @Success      200  {object}  domain.Apartment
+// @Failure      400  {object}  ErrorResponse  "Неверный запрос"
+// @Failure      401  {object}  ErrorResponse  "Требуется аутентификация"
+// @Failure      404  {object}  ErrorResponse  "Квартира не найдена"
+// @Router       /api/apartments/{id} [get]
 func (h *Handler) GetApartmentByID(w http.ResponseWriter, r *http.Request) {
 	userInfo := userContext.GetUserInfo(r.Context())
 	if userInfo == nil {
@@ -138,8 +160,17 @@ func (h *Handler) GetApartmentByID(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, apt)
 }
 
-// кладем в /api/apartments/owner/{ownerID}
-// любой аутентифицированный пользователь может получить квартиры любого владельца
+// GetApartmentsByOwnerID godoc
+// @Summary      Получение квартир по ID владельца
+// @Description  Получение списка квартир по ID владельца. Доступно для всех аутентифицированных пользователей.
+// @Tags         apartments
+// @Produce      json
+// @Security     BearerAuth
+// @Param        ownerID  path      int  true  "ID владельца"
+// @Success      200      {array}   domain.Apartment
+// @Failure      400      {object}  ErrorResponse  "Неверный запрос"
+// @Failure      401      {object}  ErrorResponse  "Требуется аутентификация"
+// @Router       /api/apartments/owner/{ownerID} [get]
 func (h *Handler) GetApartmentsByOwnerID(w http.ResponseWriter, r *http.Request) {
 	userInfo := userContext.GetUserInfo(r.Context())
 	if userInfo == nil {
@@ -163,8 +194,25 @@ func (h *Handler) GetApartmentsByOwnerID(w http.ResponseWriter, r *http.Request)
 	respondJSON(w, http.StatusOK, apartments)
 }
 
-// кладем в /api/apartments
-// любой аутентифицированный пользователь может получить список всех квартир
+// GetAllApartments godoc
+// @Summary      Получение всех квартир
+// @Description  Получение списка всех квартир с возможностью фильтрации. Доступно для всех аутентифицированных пользователей.
+// @Tags         apartments
+// @Produce      json
+// @Security     BearerAuth
+// @Param        country       query     string  false  "Фильтр по стране"
+// @Param        city          query     string  false  "Фильтр по городу"
+// @Param        min_area_m2   query     int     false  "Минимальная площадь (м²)"
+// @Param        max_area_m2   query     int     false  "Максимальная площадь (м²)"
+// @Param        rooms         query     int     false  "Количество комнат"
+// @Param        floor         query     int     false  "Этаж"
+// @Param        pets_allowed  query     bool    false  "Разрешены ли животные"
+// @Param        min_price     query     int     false  "Минимальная цена"
+// @Param        max_price     query     int     false  "Максимальная цена"
+// @Success      200           {array}   domain.Apartment
+// @Failure      401           {object}  ErrorResponse  "Требуется аутентификация"
+// @Failure      500           {object}  ErrorResponse  "Внутренняя ошибка сервера"
+// @Router       /api/apartments [get]
 func (h *Handler) GetAllApartments(w http.ResponseWriter, r *http.Request) {
 	userInfo := userContext.GetUserInfo(r.Context())
 	if userInfo == nil {
@@ -183,9 +231,21 @@ func (h *Handler) GetAllApartments(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, apartments)
 }
 
-// метод PUT
-// кладем в /api/apartments/{id}
-// владелец может обновлять только свои квартиры, админ может обновлять любые
+// UpdateApartment godoc
+// @Summary      Обновление квартиры
+// @Description  Обновление данных квартиры. Владелец может обновлять только свои квартиры, администратор может обновлять любые. Допустимые status: "active", "archived", "blocked". Допустимые price unit: "pernight", "permonth". Floor не может быть больше Totatfloors. Если установлен TotalFloors, Floor должен быть установлен, и наоборот. Все численные значения должны быть больше либо равны нулю.
+// @Tags         apartments
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id       path      int                  true  "ID квартиры"
+// @Param        request  body      UpdateApartmentRequest  true  "Данные для обновления"
+// @Success      200      {object}  domain.Apartment
+// @Failure      400      {object}  ErrorResponse  "Неверный запрос"
+// @Failure      401      {object}  ErrorResponse  "Требуется аутентификация"
+// @Failure      403      {object}  ErrorResponse  "Доступ запрещен"
+// @Failure      404      {object}  ErrorResponse  "Квартира не найдена"
+// @Router       /api/apartments/{id} [put]
 func (h *Handler) UpdateApartment(w http.ResponseWriter, r *http.Request) {
 	userInfo := userContext.GetUserInfo(r.Context())
 	if userInfo == nil {
@@ -280,9 +340,18 @@ func (h *Handler) UpdateApartment(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, updatedApartment)
 }
 
-// метод DELETE
-// кладем в /api/apartments/{id}
-// владелец может удалять только свои квартиры, админ может удалять любые
+// DeleteApartment godoc
+// @Summary      Удаление квартиры
+// @Description  Удаление квартиры. Владелец может удалять только свои квартиры, администратор может удалять любые.
+// @Tags         apartments
+// @Security     BearerAuth
+// @Param        id   path      int  true  "ID квартиры"
+// @Success      204  "Квартира успешно удалена"
+// @Failure      400  {object}  ErrorResponse  "Неверный запрос"
+// @Failure      401  {object}  ErrorResponse  "Требуется аутентификация"
+// @Failure      403  {object}  ErrorResponse  "Доступ запрещен"
+// @Failure      404  {object}  ErrorResponse  "Квартира не найдена"
+// @Router       /api/apartments/{id} [delete]
 func (h *Handler) DeleteApartment(w http.ResponseWriter, r *http.Request) {
 	userInfo := userContext.GetUserInfo(r.Context())
 	if userInfo == nil {

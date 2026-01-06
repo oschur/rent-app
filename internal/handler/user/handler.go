@@ -47,9 +47,18 @@ type ErrorResponse struct {
 	Error string `json:"error"`
 }
 
-// метод POST(не PUT т.к. операция не идемпотентная)
-// кладем в /api/users
-// доступно без аутентификации, но обычные пользователи не могут создавать админов
+// CreateUser godoc
+// @Summary      Создание пользователя
+// @Description  Создание нового пользователя. Доступно без аутентификации, но только админы могут создавать других админов.
+// @Tags         users
+// @Accept       json
+// @Produce      json
+// @Param        request  body      CreateUserRequest  true  "Данные пользователя"
+// @Success      201      {object}  domain.User
+// @Failure      400      {object}  ErrorResponse  "Неверный запрос"
+// @Failure      409      {object}  ErrorResponse  "Email уже занят"
+// @Failure      500      {object}  ErrorResponse  "Внутренняя ошибка сервера"
+// @Router       /api/users [post]
 func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	var req CreateUserRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
@@ -89,8 +98,22 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusCreated, u)
 }
 
-// тут нужен метод PUT т.к. эта операция идемпотентная
-// кладем в /api/users/{id}
+// UpdateUser godoc
+// @Summary      Обновление пользователя
+// @Description  Обновление данных пользователя. Обычные пользователи могут обновлять только свой профиль.
+// @Tags         users
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id       path      int                true  "ID пользователя"
+// @Param        request  body      UpdateUserRequest  true  "Данные для обновления"
+// @Success      200      {object}  domain.User
+// @Failure      400      {object}  ErrorResponse  "Неверный запрос"
+// @Failure      401      {object}  ErrorResponse  "Требуется аутентификация"
+// @Failure      403      {object}  ErrorResponse  "Доступ запрещен"
+// @Failure      404      {object}  ErrorResponse  "Пользователь не найден"
+// @Failure      409      {object}  ErrorResponse  "Email уже занят"
+// @Router       /api/users/{id} [put]
 func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	userInfo := userContext.GetUserInfo(r.Context())
 	if userInfo == nil {
@@ -146,7 +169,19 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, u)
 }
 
-// кладем в /api/users/{id}
+// GetUserByID godoc
+// @Summary      Получение пользователя по ID
+// @Description  Получение информации о пользователе по ID. Требуются права администратора.
+// @Tags         users
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      int  true  "ID пользователя"
+// @Success      200  {object}  domain.User
+// @Failure      400  {object}  ErrorResponse  "Неверный запрос"
+// @Failure      401  {object}  ErrorResponse  "Требуется аутентификация"
+// @Failure      403  {object}  ErrorResponse  "Требуются права администратора"
+// @Failure      404  {object}  ErrorResponse  "Пользователь не найден"
+// @Router       /api/users/{id} [get]
 func (h *Handler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 	userInfo := userContext.GetUserInfo(r.Context())
 	if userInfo == nil {
@@ -179,7 +214,19 @@ func (h *Handler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, u)
 }
 
-// кладем в /api/users/{email}
+// GetUserByEmail godoc
+// @Summary      Получение пользователя по email
+// @Description  Получение информации о пользователе по email. Требуются права администратора.
+// @Tags         users
+// @Produce      json
+// @Security     BearerAuth
+// @Param        email  path      string  true  "Email пользователя"
+// @Success      200    {object}  domain.User
+// @Failure      400    {object}  ErrorResponse  "Неверный запрос"
+// @Failure      401    {object}  ErrorResponse  "Требуется аутентификация"
+// @Failure      403    {object}  ErrorResponse  "Требуются права администратора"
+// @Failure      404    {object}  ErrorResponse  "Пользователь не найден"
+// @Router       /api/users/email/{email} [get]
 func (h *Handler) GetUserByEmail(w http.ResponseWriter, r *http.Request) {
 	userInfo := userContext.GetUserInfo(r.Context())
 	if userInfo == nil {
@@ -211,7 +258,17 @@ func (h *Handler) GetUserByEmail(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, u)
 }
 
-// кладем в /api/users
+// GetAllUsers godoc
+// @Summary      Получение всех пользователей
+// @Description  Получение списка всех пользователей. Требуются права администратора.
+// @Tags         users
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {array}   domain.User
+// @Failure      401  {object}  ErrorResponse  "Требуется аутентификация"
+// @Failure      403  {object}  ErrorResponse  "Требуются права администратора"
+// @Failure      500  {object}  ErrorResponse  "Внутренняя ошибка сервера"
+// @Router       /api/users [get]
 func (h *Handler) GetAllUsers(w http.ResponseWriter, r *http.Request) {
 	userInfo := userContext.GetUserInfo(r.Context())
 	if userInfo == nil {
@@ -233,8 +290,20 @@ func (h *Handler) GetAllUsers(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, users)
 }
 
-// метод POST
-// кладем в /api/users/{id}/reset-password
+// ResetPassword godoc
+// @Summary      Сброс пароля
+// @Description  Сброс пароля пользователя. Пользователь может сбросить только свой пароль.
+// @Tags         users
+// @Accept       json
+// @Security     BearerAuth
+// @Param        id       path      int                  true  "ID пользователя"
+// @Param        request  body      ResetPasswordRequest  true  "Новый пароль"
+// @Success      204      "Пароль успешно изменен"
+// @Failure      400      {object}  ErrorResponse  "Неверный запрос"
+// @Failure      401      {object}  ErrorResponse  "Требуется аутентификация"
+// @Failure      403      {object}  ErrorResponse  "Доступ запрещен"
+// @Failure      404      {object}  ErrorResponse  "Пользователь не найден"
+// @Router       /api/users/{id}/reset-password [put]
 func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	userInfo := userContext.GetUserInfo(r.Context())
 	if userInfo == nil {
@@ -279,8 +348,18 @@ func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// метод DELETE
-// кладем в /api/users/{id}
+// DeleteUser godoc
+// @Summary      Удаление пользователя
+// @Description  Удаление пользователя. Обычные пользователи могут удалить только свой аккаунт.
+// @Tags         users
+// @Security     BearerAuth
+// @Param        id   path      int  true  "ID пользователя"
+// @Success      204  "Пользователь успешно удален"
+// @Failure      400  {object}  ErrorResponse  "Неверный запрос"
+// @Failure      401  {object}  ErrorResponse  "Требуется аутентификация"
+// @Failure      403  {object}  ErrorResponse  "Доступ запрещен"
+// @Failure      404  {object}  ErrorResponse  "Пользователь не найден"
+// @Router       /api/users/{id} [delete]
 func (h *Handler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	userInfo := userContext.GetUserInfo(r.Context())
 	if userInfo == nil {

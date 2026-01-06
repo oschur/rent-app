@@ -19,8 +19,18 @@ func NewHandler(authService domain.Service, authenticator domain.UserAuthenticat
 	}
 }
 
-// метод POST
-// кладем в /api/auth/login
+// Login godoc
+// @Summary      Вход в систему
+// @Description  Аутентификация пользователя и выдача JWT токенов (access и refresh)
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        request  body      domain.LoginRequest  true  "Данные для входа"
+// @Success      200      {object}  domain.LoginResponse
+// @Failure      400      {object}  ErrorResponse  "Неверный запрос"
+// @Failure      401      {object}  ErrorResponse  "Неверные учетные данные"
+// @Failure      500      {object}  ErrorResponse  "Внутренняя ошибка сервера"
+// @Router       /api/auth/login [post]
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	var req domain.LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -65,8 +75,17 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, response)
 }
 
-// метод POST
-// кладем в /api/auth/refresh
+// Refresh godoc
+// @Summary      Обновление токена
+// @Description  Обновление access токена с помощью refresh токена
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        request  body      object  true  "Refresh token"  SchemaExample({"refresh_token": "string"})
+// @Success      200      {object}  domain.TokenPair
+// @Failure      400      {object}  ErrorResponse  "Неверный запрос"
+// @Failure      401      {object}  ErrorResponse  "Неверный или истекший токен"
+// @Router       /api/auth/refresh [post]
 func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		RefreshToken string `json:"refresh_token"`
@@ -112,4 +131,8 @@ func respondJSON(w http.ResponseWriter, status int, data interface{}) {
 
 func respondError(w http.ResponseWriter, status int, message string) {
 	respondJSON(w, status, map[string]string{"error": message})
+}
+
+type ErrorResponse struct {
+	Error string `json:"error"`
 }
