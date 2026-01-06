@@ -79,6 +79,17 @@ func (s *Service) GetUserByEmail(email string) (*domain.User, error) {
 	return clearPassword(user), nil
 }
 
+// GetUserByEmailForAuth возвращает пользователя с паролем для аутентификации
+// в отличие от GetUserByEmail, этот метод не очищает хэш пароля
+func (s *Service) GetUserByEmailForAuth(email string) (*domain.User, error) {
+	user, err := s.repo.GetUserByEmail(email)
+	if err != nil {
+		return nil, fmt.Errorf("error getting user: %w", err)
+	}
+
+	return user, nil
+}
+
 func (s *Service) GetAllUsers() ([]*domain.User, error) {
 	users, err := s.repo.GetAllUsers()
 	if err != nil {

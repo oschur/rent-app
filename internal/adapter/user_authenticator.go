@@ -19,7 +19,7 @@ func NewUserAuthenticatorAdapter(userService userDomain.Service) *UserAuthentica
 }
 
 func (a *UserAuthenticatorAdapter) Authenticate(email, password string) (*domain.AuthUserInfo, error) {
-	user, err := a.userService.GetUserByEmail(email)
+	user, err := a.userService.GetUserByEmailForAuth(email)
 	if err != nil {
 		return nil, err
 	}

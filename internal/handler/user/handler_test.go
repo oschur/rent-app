@@ -17,13 +17,14 @@ import (
 )
 
 type MockService struct {
-	CreateUserFunc     func(email, password, firstname, lastname string, isLandlord, isAdmin bool) (*domain.User, error)
-	GetUserByIDFunc    func(id int) (*domain.User, error)
-	GetUserByEmailFunc func(email string) (*domain.User, error)
-	GetAllUsersFunc    func() ([]*domain.User, error)
-	UpdateUserFunc     func(id int, email, firstname, lastname *string, isLandlord, isAdmin *bool) (*domain.User, error)
-	DeleteUserFunc     func(id int) error
-	ResetPasswordFunc  func(id int, password string) error
+	CreateUserFunc            func(email, password, firstname, lastname string, isLandlord, isAdmin bool) (*domain.User, error)
+	GetUserByIDFunc           func(id int) (*domain.User, error)
+	GetUserByEmailFunc        func(email string) (*domain.User, error)
+	GetUserByEmailForAuthFunc func(email string) (*domain.User, error)
+	GetAllUsersFunc           func() ([]*domain.User, error)
+	UpdateUserFunc            func(id int, email, firstname, lastname *string, isLandlord, isAdmin *bool) (*domain.User, error)
+	DeleteUserFunc            func(id int) error
+	ResetPasswordFunc         func(id int, password string) error
 }
 
 func (m *MockService) CreateUser(email, password, firstname, lastname string, isLandlord, isAdmin bool) (*domain.User, error) {
@@ -45,6 +46,13 @@ func (m *MockService) GetUserByEmail(email string) (*domain.User, error) {
 		return m.GetUserByEmailFunc(email)
 	}
 	return nil, errors.New("GetUserByEmail not implemented")
+}
+
+func (m *MockService) GetUserByEmailForAuth(email string) (*domain.User, error) {
+	if m.GetUserByEmailForAuthFunc != nil {
+		return m.GetUserByEmailForAuthFunc(email)
+	}
+	return nil, errors.New("GetUserByEmailForAuth not implemented")
 }
 
 func (m *MockService) GetAllUsers() ([]*domain.User, error) {
