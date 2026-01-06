@@ -1,0 +1,1248 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "API для управления арендой квартир",
+        "title": "Rent App API",
+        "termsOfService": "http://swagger.io/terms/",
+        "contact": {
+            "name": "Yuri Oschepkov",
+            "email": "genda5656@gmail.com"
+        },
+        "license": {
+            "name": "MIT License",
+            "url": "https://mit-license.org/"
+        },
+        "version": "1.0"
+    },
+    "host": "localhost:8080",
+    "basePath": "/",
+    "paths": {
+        "/api/apartments": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Получение списка всех квартир с возможностью фильтрации. Доступно для всех аутентифицированных пользователей.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "apartments"
+                ],
+                "summary": "Получение всех квартир",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Фильтр по стране",
+                        "name": "country",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Фильтр по городу",
+                        "name": "city",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Минимальная площадь (м²)",
+                        "name": "min_area_m2",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Максимальная площадь (м²)",
+                        "name": "max_area_m2",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Количество комнат",
+                        "name": "rooms",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Этаж",
+                        "name": "floor",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Разрешены ли животные",
+                        "name": "pets_allowed",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Минимальная цена",
+                        "name": "min_price",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Максимальная цена",
+                        "name": "max_price",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/rent-app_internal_domain_apartment.Apartment"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется аутентификация",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_apartment.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_apartment.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Создание новой квартиры. Доступно только для арендодателей и администраторов. Допустимые status: \"active\", \"archived\", \"blocked\". Допустимые price unit: \"pernight\", \"permonth\". Floor не может быть больше Totatfloors. Если установлен TotalFloors, Floor должен быть установлен, и наоборот. Все численные значения должны быть больше либо равны нулю.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "apartments"
+                ],
+                "summary": "Создание квартиры",
+                "parameters": [
+                    {
+                        "description": "Данные квартиры",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_apartment.CreateApartmentRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/rent-app_internal_domain_apartment.Apartment"
+                        }
+                    },
+                    "400": {
+                        "description": "Неверный запрос",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_apartment.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется аутентификация",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_apartment.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Доступ запрещен",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_apartment.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_apartment.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/apartments/owner/{ownerID}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Получение списка квартир по ID владельца. Доступно для всех аутентифицированных пользователей.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "apartments"
+                ],
+                "summary": "Получение квартир по ID владельца",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID владельца",
+                        "name": "ownerID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/rent-app_internal_domain_apartment.Apartment"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Неверный запрос",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_apartment.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется аутентификация",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_apartment.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/apartments/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Получение информации о квартире по ID. Доступно для всех аутентифицированных пользователей.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "apartments"
+                ],
+                "summary": "Получение квартиры по ID",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID квартиры",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/rent-app_internal_domain_apartment.Apartment"
+                        }
+                    },
+                    "400": {
+                        "description": "Неверный запрос",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_apartment.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется аутентификация",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_apartment.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Квартира не найдена",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_apartment.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Обновление данных квартиры. Владелец может обновлять только свои квартиры, администратор может обновлять любые. Допустимые status: \"active\", \"archived\", \"blocked\". Допустимые price unit: \"pernight\", \"permonth\". Floor не может быть больше Totatfloors. Если установлен TotalFloors, Floor должен быть установлен, и наоборот. Все численные значения должны быть больше либо равны нулю.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "apartments"
+                ],
+                "summary": "Обновление квартиры",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID квартиры",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Данные для обновления",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_apartment.UpdateApartmentRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/rent-app_internal_domain_apartment.Apartment"
+                        }
+                    },
+                    "400": {
+                        "description": "Неверный запрос",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_apartment.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется аутентификация",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_apartment.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Доступ запрещен",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_apartment.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Квартира не найдена",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_apartment.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Удаление квартиры. Владелец может удалять только свои квартиры, администратор может удалять любые.",
+                "tags": [
+                    "apartments"
+                ],
+                "summary": "Удаление квартиры",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID квартиры",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Квартира успешно удалена"
+                    },
+                    "400": {
+                        "description": "Неверный запрос",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_apartment.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется аутентификация",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_apartment.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Доступ запрещен",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_apartment.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Квартира не найдена",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_apartment.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/auth/login": {
+            "post": {
+                "description": "Аутентификация пользователя и выдача JWT токенов (access и refresh)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Вход в систему",
+                "parameters": [
+                    {
+                        "description": "Данные для входа",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/rent-app_internal_domain_auth.LoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/rent-app_internal_domain_auth.LoginResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Неверный запрос",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_auth.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Неверные учетные данные",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_auth.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_auth.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/auth/refresh": {
+            "post": {
+                "description": "Обновление access токена с помощью refresh токена",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Обновление токена",
+                "parameters": [
+                    {
+                        "description": "Refresh token",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/rent-app_internal_domain_auth.TokenPair"
+                        }
+                    },
+                    "400": {
+                        "description": "Неверный запрос",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_auth.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Неверный или истекший токен",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_auth.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/users": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Получение списка всех пользователей. Требуются права администратора.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Получение всех пользователей",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/rent-app_internal_domain_user.User"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется аутентификация",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_user.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Требуются права администратора",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_user.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_user.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Создание нового пользователя. Доступно без аутентификации, но только админы могут создавать других админов.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Создание пользователя",
+                "parameters": [
+                    {
+                        "description": "Данные пользователя",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_user.CreateUserRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/rent-app_internal_domain_user.User"
+                        }
+                    },
+                    "400": {
+                        "description": "Неверный запрос",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_user.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Email уже занят",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_user.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_user.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/users/email/{email}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Получение информации о пользователе по email. Требуются права администратора.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Получение пользователя по email",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Email пользователя",
+                        "name": "email",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/rent-app_internal_domain_user.User"
+                        }
+                    },
+                    "400": {
+                        "description": "Неверный запрос",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_user.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется аутентификация",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_user.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Требуются права администратора",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_user.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Пользователь не найден",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_user.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/users/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Получение информации о пользователе по ID. Требуются права администратора.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Получение пользователя по ID",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID пользователя",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/rent-app_internal_domain_user.User"
+                        }
+                    },
+                    "400": {
+                        "description": "Неверный запрос",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_user.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется аутентификация",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_user.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Требуются права администратора",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_user.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Пользователь не найден",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_user.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Обновление данных пользователя. Обычные пользователи могут обновлять только свой профиль.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Обновление пользователя",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID пользователя",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Данные для обновления",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_user.UpdateUserRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/rent-app_internal_domain_user.User"
+                        }
+                    },
+                    "400": {
+                        "description": "Неверный запрос",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_user.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется аутентификация",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_user.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Доступ запрещен",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_user.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Пользователь не найден",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_user.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Email уже занят",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_user.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Удаление пользователя. Обычные пользователи могут удалить только свой аккаунт.",
+                "tags": [
+                    "users"
+                ],
+                "summary": "Удаление пользователя",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID пользователя",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Пользователь успешно удален"
+                    },
+                    "400": {
+                        "description": "Неверный запрос",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_user.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется аутентификация",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_user.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Доступ запрещен",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_user.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Пользователь не найден",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_user.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/users/{id}/reset-password": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Сброс пароля пользователя. Пользователь может сбросить только свой пароль.",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Сброс пароля",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID пользователя",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Новый пароль",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_user.ResetPasswordRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Пароль успешно изменен"
+                    },
+                    "400": {
+                        "description": "Неверный запрос",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_user.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется аутентификация",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_user.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Доступ запрещен",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_user.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Пользователь не найден",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler_user.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "internal_handler_apartment.CreateApartmentRequest": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "area_m2": {
+                    "type": "integer"
+                },
+                "city": {
+                    "type": "string"
+                },
+                "country": {
+                    "type": "string"
+                },
+                "floor": {
+                    "type": "integer"
+                },
+                "pets_allowed": {
+                    "type": "boolean"
+                },
+                "price": {
+                    "type": "integer"
+                },
+                "price_unit": {
+                    "description": "\"pernight\", \"permonth\"",
+                    "type": "string"
+                },
+                "rooms": {
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "\"active\", \"archived\", \"blocked\"",
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "total_floors": {
+                    "type": "integer"
+                }
+            }
+        },
+        "internal_handler_apartment.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_handler_apartment.UpdateApartmentRequest": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "area_m2": {
+                    "type": "integer"
+                },
+                "city": {
+                    "type": "string"
+                },
+                "country": {
+                    "type": "string"
+                },
+                "floor": {
+                    "type": "integer"
+                },
+                "pets_allowed": {
+                    "type": "boolean"
+                },
+                "price": {
+                    "type": "integer"
+                },
+                "price_unit": {
+                    "description": "\"pernight\", \"permonth\"",
+                    "type": "string"
+                },
+                "rooms": {
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "\"active\", \"archived\", \"blocked\"",
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "total_floors": {
+                    "type": "integer"
+                }
+            }
+        },
+        "internal_handler_auth.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_handler_user.CreateUserRequest": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "firstname": {
+                    "type": "string"
+                },
+                "isadmin": {
+                    "type": "boolean"
+                },
+                "islandlord": {
+                    "type": "boolean"
+                },
+                "lastname": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_handler_user.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_handler_user.ResetPasswordRequest": {
+            "type": "object",
+            "properties": {
+                "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_handler_user.UpdateUserRequest": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "firstname": {
+                    "type": "string"
+                },
+                "isadmin": {
+                    "type": "boolean"
+                },
+                "islandlord": {
+                    "type": "boolean"
+                },
+                "lastname": {
+                    "type": "string"
+                }
+            }
+        },
+        "rent-app_internal_domain_apartment.Apartment": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "areaM2": {
+                    "type": "integer"
+                },
+                "city": {
+                    "type": "string"
+                },
+                "country": {
+                    "type": "string"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "floor": {
+                    "description": "указатель на случай если сдается дом",
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "ownerID": {
+                    "type": "integer"
+                },
+                "petsAllowed": {
+                    "type": "boolean"
+                },
+                "price": {
+                    "type": "integer"
+                },
+                "priceUnit": {
+                    "description": "per night or per month",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/rent-app_internal_domain_apartment.PriceUnit"
+                        }
+                    ]
+                },
+                "rooms": {
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "active, archived or blocked",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/rent-app_internal_domain_apartment.ApartmentStatus"
+                        }
+                    ]
+                },
+                "title": {
+                    "type": "string"
+                },
+                "totalFloors": {
+                    "type": "integer"
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "rent-app_internal_domain_apartment.ApartmentStatus": {
+            "type": "string",
+            "enum": [
+                "active",
+                "archived",
+                "blocked"
+            ],
+            "x-enum-varnames": [
+                "StatusActive",
+                "StatusArchived",
+                "StatusBlocked"
+            ]
+        },
+        "rent-app_internal_domain_apartment.PriceUnit": {
+            "type": "string",
+            "enum": [
+                "pernight",
+                "permonth"
+            ],
+            "x-enum-varnames": [
+                "PerNight",
+                "PerMonth"
+            ]
+        },
+        "rent-app_internal_domain_auth.LoginRequest": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "rent-app_internal_domain_auth.LoginResponse": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "expires_in": {
+                    "type": "integer"
+                },
+                "refresh_token": {
+                    "type": "string"
+                },
+                "user": {
+                    "type": "object",
+                    "properties": {
+                        "email": {
+                            "type": "string"
+                        },
+                        "firstname": {
+                            "type": "string"
+                        },
+                        "id": {
+                            "type": "integer"
+                        },
+                        "isadmin": {
+                            "type": "boolean"
+                        },
+                        "islandlord": {
+                            "type": "boolean"
+                        },
+                        "lastname": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "rent-app_internal_domain_auth.TokenPair": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "expires_in": {
+                    "type": "integer"
+                },
+                "refresh_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "rent-app_internal_domain_user.User": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "firstName": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "isAdmin": {
+                    "type": "boolean"
+                },
+                "isLandlord": {
+                    "type": "boolean"
+                },
+                "lastName": {
+                    "type": "string"
+                },
+                "passwordHash": {
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "description": "Type \"Bearer\" followed by a space and JWT token.",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    }
+}
