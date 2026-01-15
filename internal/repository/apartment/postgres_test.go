@@ -2,15 +2,18 @@ package apartment
 
 import (
 	"context"
+	"os"
 	"rent-app/internal/database"
 	"testing"
 
 	domain "rent-app/internal/domain/apartment"
 )
 
-const testDSN = "postgres://admin:admin@localhost:5435/users?sslmode=disable"
-
 func setupTestDB(t *testing.T) *PostgresRepo {
+	testDSN := os.Getenv("TEST_DB_DSN")
+	if testDSN == "" {
+		testDSN = "postgres://admin:admin@localhost:5432/users?sslmode=disable"
+	}
 	t.Helper()
 	ctx := context.Background()
 	pool, err := database.Connect(ctx, testDSN)
