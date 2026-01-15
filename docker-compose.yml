@@ -2,13 +2,59 @@ services:
   postgres:
     image: 'postgres:18'
     restart: always
+    env_file:
+      - .env
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: admin
-      POSTGRES_DB: users
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin}
+      POSTGRES_DB: ${POSTGRES_DB:-users}
     ports:
-      - "5435:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-admin} -d ${POSTGRES_DB:-users}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  migrate:
+    image: migrate/migrate:latest
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin}
+      POSTGRES_DB: ${POSTGRES_DB:-users}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - migrate -path=/migrations -database "postgres://$${POSTGRES_USER}:$${POSTGRES_PASSWORD}@postgres:5432/$${POSTGRES_DB}?sslmode=disable" up
+    volumes:
+      - ./internal/migrations:/migrations
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no" 
+
+  rent-app:
+    build: .
+    restart: always
+    env_file:
+      - .env
+    environment:
+      DB_DSN: ${DB_DSN}
+      PORT: ${PORT:-8080}
+      ENV: ${ENV:-development}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-secret-key-here-min-32-characters-for-production}
+    ports:
+      - "${PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+
 volumes:
   pgdata:
