@@ -202,5 +202,6 @@ go test ./...              // для прохождения тестов в inte
 
 **Yuri Oschepkov**
 - Email: genda5656@gmail.com
+- Telegram: t.me/happy_jury
 
 
