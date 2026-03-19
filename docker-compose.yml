@@ -31,7 +31,7 @@ services:
     command:
       - migrate -path=/migrations -database "postgres://$${POSTGRES_USER}:$${POSTGRES_PASSWORD}@postgres:5432/$${POSTGRES_DB}?sslmode=disable" up
     volumes:
-      - ./internal/migrations:/migrations
+      - ./migrations:/migrations
     depends_on:
       postgres:
         condition: service_healthy
