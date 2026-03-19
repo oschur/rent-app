@@ -30,12 +30,3 @@ type UpdateApartmentRequest struct {
 	TotalFloors *int
 	PetsAllowed *bool
 }
-
-type Service interface {
-	CreateApartment(req CreateApartmentRequest) (*Apartment, error)
-	GetApartmentByID(id int) (*Apartment, error)
-	GetApartmentByOwnerID(ownerID int) ([]*Apartment, error)
-	GetAllApartments(filters *ApartmentFilters) ([]*Apartment, error)
-	UpdateApartment(id int, req UpdateApartmentRequest) (*Apartment, error)
-	DeleteApartment(id int) error
-}

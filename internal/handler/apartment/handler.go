@@ -12,11 +12,20 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-type Handler struct {
-	service domain.Service
+type ApartmentService interface {
+	CreateApartment(req domain.CreateApartmentRequest) (*domain.Apartment, error)
+	GetApartmentByID(id int) (*domain.Apartment, error)
+	GetApartmentByOwnerID(ownerID int) ([]*domain.Apartment, error)
+	GetAllApartments(filters *domain.ApartmentFilters) ([]*domain.Apartment, error)
+	UpdateApartment(id int, req domain.UpdateApartmentRequest) (*domain.Apartment, error)
+	DeleteApartment(id int) error
 }
 
-func NewHandler(service domain.Service) *Handler {
+type Handler struct {
+	service ApartmentService
+}
+
+func NewHandler(service ApartmentService) *Handler {
 	return &Handler{
 		service: service,
 	}

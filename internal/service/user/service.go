@@ -14,11 +14,21 @@ var (
 	ErrInvalidInput      = errors.New("invalid input")
 )
 
-type Service struct {
-	repo domain.Repository
+type UserRepository interface {
+	InsertUser(u *domain.User) error
+	GetUserByID(id int) (*domain.User, error)
+	GetUserByEmail(email string) (*domain.User, error)
+	GetAllUsers() ([]*domain.User, error)
+	UpdateUser(u *domain.User) error
+	DeleteUser(id int) error
+	ResetPassword(id int, password string) error
 }
 
-func NewService(repo domain.Repository) *Service {
+type Service struct {
+	repo UserRepository
+}
+
+func NewService(repo UserRepository) *Service {
 	return &Service{
 		repo: repo,
 	}
@@ -75,7 +85,6 @@ func (s *Service) GetUserByEmail(email string) (*domain.User, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error getting user: %w", err)
 	}
-
 	return clearPassword(user), nil
 }
 
@@ -86,7 +95,6 @@ func (s *Service) GetUserByEmailForAuth(email string) (*domain.User, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error getting user: %w", err)
 	}
-
 	return user, nil
 }
 

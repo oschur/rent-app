@@ -14,10 +14,20 @@ import (
 )
 
 type Handler struct {
-	service domain.Service
+	service UserService
 }
 
-func NewHandler(service domain.Service) *Handler {
+type UserService interface {
+	CreateUser(email, password, firstname, lastname string, isLandlord, isAdmin bool) (*domain.User, error)
+	GetUserByID(id int) (*domain.User, error)
+	GetUserByEmail(email string) (*domain.User, error)
+	GetAllUsers() ([]*domain.User, error)
+	UpdateUser(id int, email, firstname, lastname *string, isLandlord, isAdmin *bool) (*domain.User, error)
+	DeleteUser(id int) error
+	ResetPassword(id int, password string) error
+}
+
+func NewHandler(service UserService) *Handler {
 	return &Handler{
 		service: service,
 	}

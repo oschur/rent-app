@@ -2,23 +2,27 @@ package adapter
 
 import (
 	"errors"
-	domain "rent-app/internal/domain/auth"
+	authDomain "rent-app/internal/domain/auth"
 	userDomain "rent-app/internal/domain/user"
 )
 
 // этот адаптер нужен для изоляции модулей авторизации и модулей юзера друг от друга
 
-type UserAuthenticatorAdapter struct {
-	userService userDomain.Service
+type UserAuthService interface {
+	GetUserByEmailForAuth(email string) (*userDomain.User, error)
 }
 
-func NewUserAuthenticatorAdapter(userService userDomain.Service) *UserAuthenticatorAdapter {
+type UserAuthenticatorAdapter struct {
+	userService UserAuthService
+}
+
+func NewUserAuthenticatorAdapter(userService UserAuthService) *UserAuthenticatorAdapter {
 	return &UserAuthenticatorAdapter{
 		userService: userService,
 	}
 }
 
-func (a *UserAuthenticatorAdapter) Authenticate(email, password string) (*domain.AuthUserInfo, error) {
+func (a *UserAuthenticatorAdapter) Authenticate(email, password string) (*authDomain.AuthUserInfo, error) {
 	user, err := a.userService.GetUserByEmailForAuth(email)
 	if err != nil {
 		return nil, err
@@ -32,7 +36,7 @@ func (a *UserAuthenticatorAdapter) Authenticate(email, password string) (*domain
 		return nil, errors.New("invalid credentials")
 	}
 
-	return &domain.AuthUserInfo{
+	return &authDomain.AuthUserInfo{
 		ID:         user.ID,
 		Email:      user.Email,
 		IsLandlord: user.IsLandlord,

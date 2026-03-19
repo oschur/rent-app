@@ -20,12 +20,18 @@ var (
 	ErrTokenBlacklisted = errors.New("token has been revoked")
 )
 
-type Service struct {
-	secretKey []byte
-	tokenRepo domain.RefreshTokenRepository
+type RefreshTokenRepository interface {
+	IsTokenBlacklisted(tokenID string) (bool, error)
+	BlacklistToken(tokenID string, expiresAt int64) error
+	CleanupExpiredTokens() error
 }
 
-func NewService(tokenRepo domain.RefreshTokenRepository) *Service {
+type Service struct {
+	secretKey []byte
+	tokenRepo RefreshTokenRepository
+}
+
+func NewService(tokenRepo RefreshTokenRepository) *Service {
 	secretKey := os.Getenv("JWT_SECRET_KEY")
 	if secretKey == "" {
 		secretKey = "DEFAULT_KEY_ONLY_FOR_DEVELOPEMENT" // по окончании разработки это надо убрать

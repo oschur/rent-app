@@ -13,11 +13,20 @@ var (
 	ErrInvalidInput      = errors.New("invalid input")
 )
 
-type Service struct {
-	repo domain.Repository
+type ApartmentRepository interface {
+	InsertApartment(a *domain.Apartment) error
+	GetApartmentByID(id int) (*domain.Apartment, error)
+	GetApartmentsByOwnerID(ownerID int) ([]*domain.Apartment, error)
+	GetAllApartments(filters *domain.ApartmentFilters) ([]*domain.Apartment, error)
+	UpdateApartment(a *domain.Apartment) error
+	DeleteApartment(id int) error
 }
 
-func NewService(repo domain.Repository) *Service {
+type Service struct {
+	repo ApartmentRepository
+}
+
+func NewService(repo ApartmentRepository) *Service {
 	return &Service{
 		repo: repo,
 	}

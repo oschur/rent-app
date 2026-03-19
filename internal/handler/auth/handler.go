@@ -8,11 +8,20 @@ import (
 )
 
 type Handler struct {
-	authService   domain.Service
-	authenticator domain.UserAuthenticator
+	authService   AuthService
+	authenticator UserAuthenticator
 }
 
-func NewHandler(authService domain.Service, authenticator domain.UserAuthenticator) *Handler {
+type AuthService interface {
+	GenerateToken(userID int, isLandLord bool, isAdmin bool) (*domain.TokenPair, error)
+	RefreshToken(refreshTokenString string) (*domain.TokenPair, error)
+}
+
+type UserAuthenticator interface {
+	Authenticate(email, password string) (*domain.AuthUserInfo, error)
+}
+
+func NewHandler(authService AuthService, authenticator UserAuthenticator) *Handler {
 	return &Handler{
 		authService:   authService,
 		authenticator: authenticator,

@@ -1,4 +1,4 @@
-package middleware
+package auth
 
 import (
 	"net/http"
@@ -7,7 +7,11 @@ import (
 	domain "rent-app/internal/domain/auth"
 )
 
-func AuthMiddleware(authService domain.Service) func(http.Handler) http.Handler {
+type AuthService interface {
+	ValidateAccessToken(tokenString string) (*domain.AccessTokenClaims, error)
+}
+
+func AuthMiddleware(authService AuthService) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authHeader := r.Header.Get("Authorization")
@@ -74,7 +78,7 @@ func RequireAdmin(next http.Handler) http.Handler {
 }
 
 // пока что используем это только для CreateUser
-func OptionalAuthMiddleware(authService domain.Service) func(http.Handler) http.Handler {
+func OptionalAuthMiddleware(authService AuthService) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authHeader := r.Header.Get("Authorization")
