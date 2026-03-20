@@ -3,6 +3,7 @@ package user
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/url"
 	userContext "rent-app/internal/context"
@@ -11,6 +12,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 )
 
 type Handler struct {
@@ -71,9 +73,13 @@ type ErrorResponse struct {
 // @Failure      500      {object}  ErrorResponse  "Внутренняя ошибка сервера"
 // @Router       /api/users [post]
 func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
+	const op = "user.CreateUser"
+	log := slog.With(slog.String("op", op), slog.String("request_id", middleware.GetReqID(r.Context())))
+
 	var req CreateUserRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
+		log.Error("invalid request body", slog.String("error", err.Error()))
 		respondError(w, http.StatusBadRequest, "bad request")
 		return
 	}
@@ -95,17 +101,21 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	)
 	if err != nil {
 		if errors.Is(err, user.ErrEmailAlreadyTaken) {
+			log.Error("email already taken")
 			respondError(w, http.StatusConflict, "email already taken")
 			return
 		}
 		if errors.Is(err, user.ErrInvalidInput) {
+			log.Error("invalid input", slog.String("error", err.Error()))
 			respondError(w, http.StatusBadRequest, "invalid input")
 			return
 		}
+		log.Error("failed to create user", slog.String("error", err.Error()))
 		respondError(w, http.StatusInternalServerError, "failed to create user")
 		return
 	}
 
+	log.Info("user created", slog.Int("user_id", u.ID))
 	respondJSON(w, http.StatusCreated, u)
 }
 
@@ -126,8 +136,12 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 // @Failure      409      {object}  ErrorResponse  "Email уже занят"
 // @Router       /api/users/{id} [put]
 func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
+	const op = "user.UpdateUser"
+	log := slog.With(slog.String("op", op), slog.String("request_id", middleware.GetReqID(r.Context())))
+
 	userInfo := userContext.GetUserInfo(r.Context())
 	if userInfo == nil {
+		log.Error("authentication required")
 		respondError(w, http.StatusUnauthorized, "authentication required")
 		return
 	}
@@ -135,12 +149,14 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
+		log.Error("invalid user ID", slog.String("error", err.Error()))
 		respondError(w, http.StatusBadRequest, "invalid user ID")
 		return
 	}
 
 	// обычный пользователь может обновлять только себя
 	if !userInfo.IsAdmin && userInfo.UserID != id {
+		log.Error("you can only update your own profile")
 		respondError(w, http.StatusForbidden, "you can only update your own profile")
 		return
 	}
@@ -148,6 +164,7 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	var req UpdateUserRequest
 	err = json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
+		log.Error("bad request", slog.String("error", err.Error()))
 		respondError(w, http.StatusBadRequest, "bad request")
 		return
 	}
@@ -166,17 +183,21 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	)
 	if err != nil {
 		if errors.Is(err, user.ErrEmailAlreadyTaken) {
+			log.Error("email already taken")
 			respondError(w, http.StatusConflict, "email already taken")
 			return
 		}
 		if errors.Is(err, user.ErrUserNotFound) {
+			log.Error("user not found")
 			respondError(w, http.StatusNotFound, "user not found")
 			return
 		}
+		log.Error("failed to update user", slog.String("error", err.Error()))
 		respondError(w, http.StatusInternalServerError, "failed to update user")
 		return
 	}
 
+	log.Info("user updated", slog.Int("user_id", u.ID))
 	respondJSON(w, http.StatusOK, u)
 }
 
@@ -194,8 +215,12 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 // @Failure      404  {object}  ErrorResponse  "Пользователь не найден"
 // @Router       /api/users/{id} [get]
 func (h *Handler) GetUserByID(w http.ResponseWriter, r *http.Request) {
+	const op = "user.GetUserByID"
+	log := slog.With(slog.String("op", op), slog.String("request_id", middleware.GetReqID(r.Context())))
+
 	userInfo := userContext.GetUserInfo(r.Context())
 	if userInfo == nil {
+		log.Error("authentication required")
 		respondError(w, http.StatusUnauthorized, "authentication required")
 		return
 	}
@@ -203,11 +228,13 @@ func (h *Handler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
+		log.Error("invalid user ID", slog.String("error", err.Error()))
 		respondError(w, http.StatusBadRequest, "invalid user ID")
 		return
 	}
 
 	if !userInfo.IsAdmin {
+		log.Error("admin access required")
 		respondError(w, http.StatusForbidden, "admin access required")
 		return
 	}
@@ -215,13 +242,16 @@ func (h *Handler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 	u, err := h.service.GetUserByID(id)
 	if err != nil {
 		if errors.Is(err, user.ErrUserNotFound) {
+			log.Error("user not found")
 			respondError(w, http.StatusNotFound, "user not found")
 			return
 		}
+		log.Error("failed to get user", slog.String("error", err.Error()))
 		respondError(w, http.StatusInternalServerError, "failed to get user")
 		return
 	}
 
+	log.Info("user found", slog.Int("user_id", u.ID))
 	respondJSON(w, http.StatusOK, u)
 }
 
@@ -239,19 +269,25 @@ func (h *Handler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 // @Failure      404    {object}  ErrorResponse  "Пользователь не найден"
 // @Router       /api/users/email/{email} [get]
 func (h *Handler) GetUserByEmail(w http.ResponseWriter, r *http.Request) {
+	const op = "user.GetUserByEmail"
+	log := slog.With(slog.String("op", op), slog.String("request_id", middleware.GetReqID(r.Context())))
+
 	userInfo := userContext.GetUserInfo(r.Context())
 	if userInfo == nil {
+		log.Error("authentication required")
 		respondError(w, http.StatusUnauthorized, "authentication required")
 		return
 	}
 
 	if !userInfo.IsAdmin {
+		log.Error("admin access required")
 		respondError(w, http.StatusForbidden, "admin access required")
 		return
 	}
 
 	emailParam := chi.URLParam(r, "email")
 	if emailParam == "" {
+		log.Error("email parameter is required")
 		respondError(w, http.StatusBadRequest, "email parameter is required")
 		return
 	}
@@ -259,19 +295,23 @@ func (h *Handler) GetUserByEmail(w http.ResponseWriter, r *http.Request) {
 	// приводим email%40example.com к email@example.com
 	email, err := url.PathUnescape(emailParam)
 	if err != nil {
+		log.Error("failed to unescape email", slog.String("error", err.Error()))
 		email = emailParam
 	}
 
 	u, err := h.service.GetUserByEmail(email)
 	if err != nil {
 		if errors.Is(err, user.ErrUserNotFound) {
+			log.Error("user not found")
 			respondError(w, http.StatusNotFound, "user not found")
 			return
 		}
+		log.Error("failed to get user", slog.String("error", err.Error()))
 		respondError(w, http.StatusInternalServerError, "failed to get user")
 		return
 	}
 
+	log.Info("user found", slog.Int("user_id", u.ID))
 	respondJSON(w, http.StatusOK, u)
 }
 
@@ -287,23 +327,30 @@ func (h *Handler) GetUserByEmail(w http.ResponseWriter, r *http.Request) {
 // @Failure      500  {object}  ErrorResponse  "Внутренняя ошибка сервера"
 // @Router       /api/users [get]
 func (h *Handler) GetAllUsers(w http.ResponseWriter, r *http.Request) {
+	const op = "user.GetAllUsers"
+	log := slog.With(slog.String("op", op), slog.String("request_id", middleware.GetReqID(r.Context())))
+
 	userInfo := userContext.GetUserInfo(r.Context())
 	if userInfo == nil {
+		log.Error("authentication required")
 		respondError(w, http.StatusUnauthorized, "authentication required")
 		return
 	}
 
 	if !userInfo.IsAdmin {
+		log.Error("admin access required")
 		respondError(w, http.StatusForbidden, "admin access required")
 		return
 	}
 
 	users, err := h.service.GetAllUsers()
 	if err != nil {
+		log.Error("failed to get users", slog.String("error", err.Error()))
 		respondError(w, http.StatusInternalServerError, "failed to get users")
 		return
 	}
 
+	log.Info("users found", slog.Int("count", len(users)))
 	respondJSON(w, http.StatusOK, users)
 }
 
@@ -322,8 +369,12 @@ func (h *Handler) GetAllUsers(w http.ResponseWriter, r *http.Request) {
 // @Failure      404      {object}  ErrorResponse  "Пользователь не найден"
 // @Router       /api/users/{id}/reset-password [put]
 func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	const op = "user.ResetPassword"
+	log := slog.With(slog.String("op", op), slog.String("request_id", middleware.GetReqID(r.Context())))
+
 	userInfo := userContext.GetUserInfo(r.Context())
 	if userInfo == nil {
+		log.Error("authentication required")
 		respondError(w, http.StatusUnauthorized, "authentication required")
 		return
 	}
@@ -331,12 +382,14 @@ func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
+		log.Error("invalid user ID", slog.String("error", err.Error()))
 		respondError(w, http.StatusBadRequest, "invalid user ID")
 		return
 	}
 
 	// пользователь может сбросить только свой пароль
 	if userInfo.UserID != id {
+		log.Error("you can only reset your own password")
 		respondError(w, http.StatusForbidden, "you can only reset your own password")
 		return
 	}
@@ -344,6 +397,7 @@ func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	var req ResetPasswordRequest
 	err = json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
+		log.Error("bad request", slog.String("error", err.Error()))
 		respondError(w, http.StatusBadRequest, "bad request")
 		return
 	}
@@ -351,17 +405,21 @@ func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	err = h.service.ResetPassword(id, req.Password)
 	if err != nil {
 		if errors.Is(err, user.ErrInvalidInput) {
+			log.Error("invalid password")
 			respondError(w, http.StatusBadRequest, "invalid password")
 			return
 		}
 		if errors.Is(err, user.ErrUserNotFound) {
+			log.Error("user not found")
 			respondError(w, http.StatusNotFound, "user not found")
 			return
 		}
+		log.Error("failed to reset password", slog.String("error", err.Error()))
 		respondError(w, http.StatusInternalServerError, "failed to reset password")
 		return
 	}
 
+	log.Info("password reset", slog.Int("user_id", id))
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -378,8 +436,12 @@ func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 // @Failure      404  {object}  ErrorResponse  "Пользователь не найден"
 // @Router       /api/users/{id} [delete]
 func (h *Handler) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	const op = "user.DeleteUser"
+	log := slog.With(slog.String("op", op), slog.String("request_id", middleware.GetReqID(r.Context())))
+
 	userInfo := userContext.GetUserInfo(r.Context())
 	if userInfo == nil {
+		log.Error("authentication required")
 		respondError(w, http.StatusUnauthorized, "authentication required")
 		return
 	}
@@ -387,12 +449,14 @@ func (h *Handler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
+		log.Error("invalid user ID", slog.String("error", err.Error()))
 		respondError(w, http.StatusBadRequest, "invalid user ID")
 		return
 	}
 
 	// обычный пользователь может удалить только себя
 	if !userInfo.IsAdmin && userInfo.UserID != id {
+		log.Error("you can only delete your own account")
 		respondError(w, http.StatusForbidden, "you can only delete your own account")
 		return
 	}
@@ -400,13 +464,16 @@ func (h *Handler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	err = h.service.DeleteUser(id)
 	if err != nil {
 		if errors.Is(err, user.ErrUserNotFound) {
+			log.Error("user not found")
 			respondError(w, http.StatusNotFound, "user not found")
 			return
 		}
-		respondJSON(w, http.StatusInternalServerError, "failed to delete user")
+		log.Error("failed to delete user", slog.String("error", err.Error()))
+		respondError(w, http.StatusInternalServerError, "failed to delete user")
 		return
 	}
 
+	log.Info("user deleted", slog.Int("user_id", id))
 	w.WriteHeader(http.StatusNoContent)
 }
 

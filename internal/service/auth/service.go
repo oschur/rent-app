@@ -166,7 +166,7 @@ func (s *Service) RefreshToken(refreshTokenString string) (*domain.TokenPair, er
 	// инвалидируем использованный refresh token
 	expiresAt := refreshClaims.ExpiresAt.Time.Unix()
 	if err := s.tokenRepo.BlacklistToken(tokenID, expiresAt); err != nil {
-		_ = err // по-хорошему тут надо прологировать ошибку, но я займусь этим позже
+		return nil, fmt.Errorf("failed to blacklist used refresh token: %w", err)
 	}
 
 	return newTokenPair, nil

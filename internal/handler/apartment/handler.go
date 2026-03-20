@@ -3,6 +3,7 @@ package apartment
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	userContext "rent-app/internal/context"
 	domain "rent-app/internal/domain/apartment"
@@ -10,6 +11,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 )
 
 type ApartmentService interface {
@@ -80,13 +82,18 @@ type ErrorResponse struct {
 // @Failure      500      {object}  ErrorResponse  "Внутренняя ошибка сервера"
 // @Router       /api/apartments [post]
 func (h *Handler) CreateApartment(w http.ResponseWriter, r *http.Request) {
+	const op = "apartment.CreateApartment"
+	log := slog.With(slog.String("op", op), slog.String("request_id", middleware.GetReqID(r.Context())))
+
 	userInfo := userContext.GetUserInfo(r.Context())
 	if userInfo == nil {
+		log.Error("authentication required")
 		respondError(w, http.StatusUnauthorized, "authentication required")
 		return
 	}
 
 	if !userInfo.IsLandlord && !userInfo.IsAdmin {
+		log.Error("only landlords and admins can create apartments")
 		respondError(w, http.StatusForbidden, "only landlords and admins can create apartments")
 		return
 	}
@@ -94,6 +101,7 @@ func (h *Handler) CreateApartment(w http.ResponseWriter, r *http.Request) {
 	var req CreateApartmentRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
+		log.Error("bad request", slog.String("error", err.Error()))
 		respondError(w, http.StatusBadRequest, "bad request")
 		return
 	}
@@ -120,13 +128,16 @@ func (h *Handler) CreateApartment(w http.ResponseWriter, r *http.Request) {
 	apt, err := h.service.CreateApartment(serviceReq)
 	if err != nil {
 		if errors.Is(err, apartment.ErrInvalidInput) {
+			log.Error("invalid input", slog.String("error", err.Error()))
 			respondError(w, http.StatusBadRequest, "invalid input")
 			return
 		}
+		log.Error("failed to create apartment", slog.String("error", err.Error()))
 		respondError(w, http.StatusInternalServerError, "failed to create apartment")
 		return
 	}
 
+	log.Info("apartment created", slog.Int("apartment_id", apt.ID), slog.Int("owner_id", apt.OwnerID))
 	respondJSON(w, http.StatusCreated, apt)
 }
 
@@ -143,8 +154,12 @@ func (h *Handler) CreateApartment(w http.ResponseWriter, r *http.Request) {
 // @Failure      404  {object}  ErrorResponse  "Квартира не найдена"
 // @Router       /api/apartments/{id} [get]
 func (h *Handler) GetApartmentByID(w http.ResponseWriter, r *http.Request) {
+	const op = "apartment.GetApartmentByID"
+	log := slog.With(slog.String("op", op), slog.String("request_id", middleware.GetReqID(r.Context())))
+
 	userInfo := userContext.GetUserInfo(r.Context())
 	if userInfo == nil {
+		log.Error("authentication required")
 		respondError(w, http.StatusUnauthorized, "authentication required")
 		return
 	}
@@ -152,6 +167,7 @@ func (h *Handler) GetApartmentByID(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
+		log.Error("invalid apartment ID", slog.String("error", err.Error()))
 		respondError(w, http.StatusBadRequest, "invalid apartment ID")
 		return
 	}
@@ -159,13 +175,16 @@ func (h *Handler) GetApartmentByID(w http.ResponseWriter, r *http.Request) {
 	apt, err := h.service.GetApartmentByID(id)
 	if err != nil {
 		if errors.Is(err, apartment.ErrApartmentNotFound) {
+			log.Error("apartment not found")
 			respondError(w, http.StatusNotFound, "apartment not found")
 			return
 		}
+		log.Error("failed to get apartment", slog.String("error", err.Error()))
 		respondError(w, http.StatusInternalServerError, "failed to get apartment")
 		return
 	}
 
+	log.Info("apartment found", slog.Int("apartment_id", apt.ID))
 	respondJSON(w, http.StatusOK, apt)
 }
 
@@ -181,8 +200,12 @@ func (h *Handler) GetApartmentByID(w http.ResponseWriter, r *http.Request) {
 // @Failure      401      {object}  ErrorResponse  "Требуется аутентификация"
 // @Router       /api/apartments/owner/{ownerID} [get]
 func (h *Handler) GetApartmentsByOwnerID(w http.ResponseWriter, r *http.Request) {
+	const op = "apartment.GetApartmentsByOwnerID"
+	log := slog.With(slog.String("op", op), slog.String("request_id", middleware.GetReqID(r.Context())))
+
 	userInfo := userContext.GetUserInfo(r.Context())
 	if userInfo == nil {
+		log.Error("authentication required")
 		respondError(w, http.StatusUnauthorized, "authentication required")
 		return
 	}
@@ -190,16 +213,19 @@ func (h *Handler) GetApartmentsByOwnerID(w http.ResponseWriter, r *http.Request)
 	ownerIDStr := chi.URLParam(r, "ownerID")
 	ownerID, err := strconv.Atoi(ownerIDStr)
 	if err != nil {
+		log.Error("invalid owner ID", slog.String("error", err.Error()))
 		respondError(w, http.StatusBadRequest, "invalid owner ID")
 		return
 	}
 
 	apartments, err := h.service.GetApartmentByOwnerID(ownerID)
 	if err != nil {
+		log.Error("failed to get apartments", slog.String("error", err.Error()))
 		respondError(w, http.StatusInternalServerError, "failed to get apartments")
 		return
 	}
 
+	log.Info("apartments found", slog.Int("owner_id", ownerID), slog.Int("count", len(apartments)))
 	respondJSON(w, http.StatusOK, apartments)
 }
 
@@ -223,8 +249,12 @@ func (h *Handler) GetApartmentsByOwnerID(w http.ResponseWriter, r *http.Request)
 // @Failure      500           {object}  ErrorResponse  "Внутренняя ошибка сервера"
 // @Router       /api/apartments [get]
 func (h *Handler) GetAllApartments(w http.ResponseWriter, r *http.Request) {
+	const op = "apartment.GetAllApartments"
+	log := slog.With(slog.String("op", op), slog.String("request_id", middleware.GetReqID(r.Context())))
+
 	userInfo := userContext.GetUserInfo(r.Context())
 	if userInfo == nil {
+		log.Error("authentication required")
 		respondError(w, http.StatusUnauthorized, "authentication required")
 		return
 	}
@@ -233,10 +263,12 @@ func (h *Handler) GetAllApartments(w http.ResponseWriter, r *http.Request) {
 
 	apartments, err := h.service.GetAllApartments(filters)
 	if err != nil {
+		log.Error("failed to get apartments", slog.String("error", err.Error()))
 		respondError(w, http.StatusInternalServerError, "failed to get apartments")
 		return
 	}
 
+	log.Info("apartments found", slog.Int("count", len(apartments)))
 	respondJSON(w, http.StatusOK, apartments)
 }
 
@@ -256,8 +288,12 @@ func (h *Handler) GetAllApartments(w http.ResponseWriter, r *http.Request) {
 // @Failure      404      {object}  ErrorResponse  "Квартира не найдена"
 // @Router       /api/apartments/{id} [put]
 func (h *Handler) UpdateApartment(w http.ResponseWriter, r *http.Request) {
+	const op = "apartment.UpdateApartment"
+	log := slog.With(slog.String("op", op), slog.String("request_id", middleware.GetReqID(r.Context())))
+
 	userInfo := userContext.GetUserInfo(r.Context())
 	if userInfo == nil {
+		log.Error("authentication required")
 		respondError(w, http.StatusUnauthorized, "authentication required")
 		return
 	}
@@ -265,6 +301,7 @@ func (h *Handler) UpdateApartment(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
+		log.Error("invalid apartment ID", slog.String("error", err.Error()))
 		respondError(w, http.StatusBadRequest, "invalid apartment ID")
 		return
 	}
@@ -272,15 +309,18 @@ func (h *Handler) UpdateApartment(w http.ResponseWriter, r *http.Request) {
 	apt, err := h.service.GetApartmentByID(id)
 	if err != nil {
 		if errors.Is(err, apartment.ErrApartmentNotFound) {
+			log.Error("apartment not found")
 			respondError(w, http.StatusNotFound, "apartment not found")
 			return
 		}
+		log.Error("failed to get apartment", slog.String("error", err.Error()))
 		respondError(w, http.StatusInternalServerError, "failed to get apartment")
 		return
 	}
 
 	// обычный пользователь может обновлять только свои квартиры
 	if !userInfo.IsAdmin && apt.OwnerID != userInfo.UserID {
+		log.Error("you can only update your own apartments")
 		respondError(w, http.StatusForbidden, "you can only update your own apartments")
 		return
 	}
@@ -288,6 +328,7 @@ func (h *Handler) UpdateApartment(w http.ResponseWriter, r *http.Request) {
 	var req UpdateApartmentRequest
 	err = json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
+		log.Error("bad request", slog.String("error", err.Error()))
 		respondError(w, http.StatusBadRequest, "bad request")
 		return
 	}
@@ -335,17 +376,21 @@ func (h *Handler) UpdateApartment(w http.ResponseWriter, r *http.Request) {
 	updatedApartment, err := h.service.UpdateApartment(id, serviceReq)
 	if err != nil {
 		if errors.Is(err, apartment.ErrApartmentNotFound) {
+			log.Error("apartment not found")
 			respondError(w, http.StatusNotFound, "apartment not found")
 			return
 		}
 		if errors.Is(err, apartment.ErrInvalidInput) {
+			log.Error("invalid input", slog.String("error", err.Error()))
 			respondError(w, http.StatusBadRequest, "invalid input")
 			return
 		}
+		log.Error("failed to update apartment", slog.String("error", err.Error()))
 		respondError(w, http.StatusInternalServerError, "failed to update apartment")
 		return
 	}
 
+	log.Info("apartment updated", slog.Int("apartment_id", updatedApartment.ID))
 	respondJSON(w, http.StatusOK, updatedApartment)
 }
 
@@ -362,15 +407,19 @@ func (h *Handler) UpdateApartment(w http.ResponseWriter, r *http.Request) {
 // @Failure      404  {object}  ErrorResponse  "Квартира не найдена"
 // @Router       /api/apartments/{id} [delete]
 func (h *Handler) DeleteApartment(w http.ResponseWriter, r *http.Request) {
+	const op = "apartment.DeleteApartment"
+	log := slog.With(slog.String("op", op), slog.String("request_id", middleware.GetReqID(r.Context())))
+
 	userInfo := userContext.GetUserInfo(r.Context())
 	if userInfo == nil {
+		log.Error("authentication required")
 		respondError(w, http.StatusUnauthorized, "authentication required")
 		return
 	}
-
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
+		log.Error("invalid apartment ID", slog.String("error", err.Error()))
 		respondError(w, http.StatusBadRequest, "invalid apartment ID")
 		return
 	}
@@ -378,15 +427,18 @@ func (h *Handler) DeleteApartment(w http.ResponseWriter, r *http.Request) {
 	apt, err := h.service.GetApartmentByID(id)
 	if err != nil {
 		if errors.Is(err, apartment.ErrApartmentNotFound) {
+			log.Error("apartment not found")
 			respondError(w, http.StatusNotFound, "apartment not found")
 			return
 		}
+		log.Error("failed to get apartment", slog.String("error", err.Error()))
 		respondError(w, http.StatusInternalServerError, "failed to get apartment")
 		return
 	}
 
 	// обычный пользователь может удалять только свои квартиры
 	if !userInfo.IsAdmin && apt.OwnerID != userInfo.UserID {
+		log.Error("you can only delete your own apartments")
 		respondError(w, http.StatusForbidden, "you can only delete your own apartments")
 		return
 	}
@@ -394,13 +446,16 @@ func (h *Handler) DeleteApartment(w http.ResponseWriter, r *http.Request) {
 	err = h.service.DeleteApartment(id)
 	if err != nil {
 		if errors.Is(err, apartment.ErrApartmentNotFound) {
+			log.Error("apartment not found")
 			respondError(w, http.StatusNotFound, "apartment not found")
 			return
 		}
+		log.Error("failed to delete apartment", slog.String("error", err.Error()))
 		respondError(w, http.StatusInternalServerError, "failed to delete apartment")
 		return
 	}
 
+	log.Info("apartment deleted", slog.Int("apartment_id", id))
 	w.WriteHeader(http.StatusNoContent)
 }
 

@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -13,7 +13,9 @@ import (
 	apartmentHandler "rent-app/internal/handler/apartment"
 	authHandler "rent-app/internal/handler/auth"
 	userHandler "rent-app/internal/handler/user"
-	"rent-app/internal/middleware"
+	slogpretty "rent-app/internal/lib/logger/handlers/slogpretty"
+	mwAuth "rent-app/internal/middleware/auth"
+	mwLogger "rent-app/internal/middleware/logger"
 	apartmentRepo "rent-app/internal/repository/apartment"
 	authRepo "rent-app/internal/repository/auth"
 	userRepo "rent-app/internal/repository/user"
@@ -24,6 +26,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	httpSwagger "github.com/swaggo/http-swagger"
 )
 
@@ -51,12 +54,19 @@ const (
 	dbTimeout          = 3 * time.Second
 	shutdownTimeout    = 5 * time.Second
 	tokenCleanupPeriod = 1 * time.Hour
+	envLocal           = "local"
+	envDev             = "development"
+	envProd            = "production"
 )
 
 func main() {
 	cfg, err := config.ConfigLoad()
+	log := setupLogger(cfg.Env)
+	log.Info("starting server", slog.String("env", cfg.Env))
+	log.Debug("debug message", slog.String("env", cfg.Env))
 	if err != nil {
-		log.Fatal("failed to load config:", err)
+		log.Error("failed to load config", slog.String("env", cfg.Env), slog.String("err", err.Error()))
+		return
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
@@ -64,11 +74,12 @@ func main() {
 
 	db, err := database.Connect(ctx, cfg.DSN)
 	if err != nil {
-		log.Fatal("failed to connect to database:", err)
+		log.Error("failed to connect to database", slog.String("env", cfg.Env), slog.String("err", err.Error()))
+		return
 	}
 	defer db.Close()
 
-	log.Println("successfully connected to database")
+	log.Info("successfully connected to database")
 
 	userRepository := userRepo.NewPostgresRepo(db)
 	authRepository := authRepo.NewPostgresRepo(db)
@@ -85,6 +96,9 @@ func main() {
 	apartmentHandlerInstance := apartmentHandler.NewHandler(apartmentServiceInstance)
 
 	mux := chi.NewRouter()
+
+	mux.Use(middleware.RequestID)
+	mux.Use(mwLogger.New(log))
 
 	docs.SwaggerInfo.Host = "localhost:" + cfg.Port
 	docs.SwaggerInfo.BasePath = "/"
@@ -104,11 +118,11 @@ func main() {
 	})
 
 	mux.Route("/api/users", func(r chi.Router) {
-		r.With(middleware.OptionalAuthMiddleware(authServiceInstance)).Post("/", userHandlerInstance.CreateUser)
-		r.With(middleware.AuthMiddleware(authServiceInstance)).Route("/", func(r chi.Router) {
-			r.Method("GET", "/", middleware.RequireAdmin(http.HandlerFunc(userHandlerInstance.GetAllUsers)))
-			r.Method("GET", "/{id}", middleware.RequireAdmin(http.HandlerFunc(userHandlerInstance.GetUserByID)))
-			r.Method("GET", "/email/{email}", middleware.RequireAdmin(http.HandlerFunc(userHandlerInstance.GetUserByEmail)))
+		r.With(mwAuth.OptionalAuthMiddleware(authServiceInstance)).Post("/", userHandlerInstance.CreateUser)
+		r.With(mwAuth.AuthMiddleware(authServiceInstance)).Route("/", func(r chi.Router) {
+			r.Method("GET", "/", mwAuth.RequireAdmin(http.HandlerFunc(userHandlerInstance.GetAllUsers)))
+			r.Method("GET", "/{id}", mwAuth.RequireAdmin(http.HandlerFunc(userHandlerInstance.GetUserByID)))
+			r.Method("GET", "/email/{email}", mwAuth.RequireAdmin(http.HandlerFunc(userHandlerInstance.GetUserByEmail)))
 			r.Put("/{id}", userHandlerInstance.UpdateUser)
 			r.Put("/{id}/reset-password", userHandlerInstance.ResetPassword)
 			r.Delete("/{id}", userHandlerInstance.DeleteUser)
@@ -116,7 +130,7 @@ func main() {
 	})
 
 	mux.Route("/api/apartments", func(r chi.Router) {
-		r.With(middleware.AuthMiddleware(authServiceInstance)).Route("/", func(r chi.Router) {
+		r.With(mwAuth.AuthMiddleware(authServiceInstance)).Route("/", func(r chi.Router) {
 			r.Post("/", apartmentHandlerInstance.CreateApartment)
 			r.Get("/", apartmentHandlerInstance.GetAllApartments)
 			r.Get("/{id}", apartmentHandlerInstance.GetApartmentByID)
@@ -140,14 +154,14 @@ func main() {
 		defer ticker.Stop()
 
 		if err := authRepository.CleanupExpiredTokens(); err != nil {
-			log.Printf("failed to cleanup expired tokens: %v", err)
+			log.Error("failed to cleanup expired tokens", slog.String("env", cfg.Env), slog.String("err", err.Error()))
 		}
 
 		for {
 			select {
 			case <-ticker.C:
 				if err := authRepository.CleanupExpiredTokens(); err != nil {
-					log.Printf("failed to cleanup expired tokens: %v", err)
+					log.Error("failed to cleanup expired tokens", slog.String("env", cfg.Env), slog.String("err", err.Error()))
 				}
 			case <-bgCtx.Done():
 				return
@@ -156,9 +170,9 @@ func main() {
 	}()
 
 	go func() {
-		log.Printf("Starting server on port %s...", cfg.Port)
+		log.Info("starting server", slog.String("env", cfg.Env), slog.String("port", cfg.Port))
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatal("failed to start server:", err)
+			log.Error("failed to start server", slog.String("env", cfg.Env), slog.String("err", err.Error()))
 		}
 	}()
 
@@ -166,14 +180,48 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	log.Println("Shutting down server...")
+	log.Info("Shutting down server...")
 
 	ctx, cancel = context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 
 	if err := server.Shutdown(ctx); err != nil {
-		log.Fatal("Server forced to shutdown:", err)
+		log.Error("server forced to shutdown", slog.String("env", cfg.Env), slog.String("err", err.Error()))
 	}
 
-	log.Println("Server exited")
+	log.Info("Server exited")
+}
+
+func setupLogger(env string) *slog.Logger {
+	var logger *slog.Logger
+
+	switch env {
+	case envLocal:
+		logger = setupPrettySlog()
+	case envDev:
+		logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		}))
+	case envProd:
+		logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+			Level: slog.LevelInfo,
+		}))
+	default:
+		logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+			Level: slog.LevelInfo,
+		}))
+	}
+	return logger
+}
+
+func setupPrettySlog() *slog.Logger {
+	opts := slogpretty.PrettyHandlerOptions{
+		SlogOpts: &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		},
+	}
+
+	handler := opts.NewPrettyHandler(os.Stdout)
+
+	return slog.New(handler)
 }

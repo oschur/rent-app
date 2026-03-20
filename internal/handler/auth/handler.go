@@ -2,9 +2,14 @@ package auth
 
 import (
 	"encoding/json"
+	"errors"
+	"log/slog"
 	"net/http"
 
 	domain "rent-app/internal/domain/auth"
+	serviceAuth "rent-app/internal/service/auth"
+
+	"github.com/go-chi/chi/v5/middleware"
 )
 
 type Handler struct {
@@ -41,25 +46,32 @@ func NewHandler(authService AuthService, authenticator UserAuthenticator) *Handl
 // @Failure      500      {object}  ErrorResponse  "Внутренняя ошибка сервера"
 // @Router       /api/auth/login [post]
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
+	const op = "auth.Login"
+	log := slog.With(slog.String("op", op), slog.String("request_id", middleware.GetReqID(r.Context())))
+
 	var req domain.LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Error("invalid request body", slog.String("error", err.Error()))
 		respondError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
 	if req.Email == "" || req.Password == "" {
+		log.Error("email and password are required")
 		respondError(w, http.StatusBadRequest, "email and password are required")
 		return
 	}
 
 	userInfo, err := h.authenticator.Authenticate(req.Email, req.Password)
 	if err != nil {
+		log.Error("invalid credentials", slog.String("error", err.Error()))
 		respondError(w, http.StatusUnauthorized, "invalid credentials")
 		return
 	}
 
 	tokenPair, err := h.authService.GenerateToken(userInfo.ID, userInfo.IsLandlord, userInfo.IsAdmin)
 	if err != nil {
+		log.Error("failed to generate tokens", slog.String("error", err.Error()))
 		respondError(w, http.StatusInternalServerError, "failed to generate tokens")
 		return
 	}
@@ -81,6 +93,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
+	log.Info("login successful", slog.Int("user_id", userInfo.ID))
 	respondJSON(w, http.StatusOK, response)
 }
 
@@ -96,15 +109,20 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 // @Failure      401      {object}  ErrorResponse  "Неверный или истекший токен"
 // @Router       /api/auth/refresh [post]
 func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
+	const op = "auth.Refresh"
+	log := slog.With(slog.String("op", op), slog.String("request_id", middleware.GetReqID(r.Context())))
+
 	var req struct {
 		RefreshToken string `json:"refresh_token"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Error("invalid request body", slog.String("error", err.Error()))
 		respondError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
 	if req.RefreshToken == "" {
+		log.Error("refresh_token is required")
 		respondError(w, http.StatusBadRequest, "refresh_token is required")
 		return
 	}
@@ -112,23 +130,33 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 	// Обновляем токены
 	tokenPair, err := h.authService.RefreshToken(req.RefreshToken)
 	if err != nil {
-		errMsg := err.Error()
-		if errMsg == "token expired" {
+		if errors.Is(err, serviceAuth.ErrTokenExpired) {
+			log.Error("token expired")
 			respondError(w, http.StatusUnauthorized, "token expired")
 			return
 		}
-		if errMsg == "token has been revoked" {
+		if errors.Is(err, serviceAuth.ErrTokenBlacklisted) {
+			log.Error("token has been revoked")
 			respondError(w, http.StatusUnauthorized, "token has been revoked")
 			return
 		}
-		if errMsg == "invalid token type" {
+		if errors.Is(err, serviceAuth.ErrInvalidTokenType) {
+			log.Error("invalid token type")
 			respondError(w, http.StatusUnauthorized, "invalid token type")
 			return
 		}
-		respondError(w, http.StatusUnauthorized, "invalid token")
+		if errors.Is(err, serviceAuth.ErrInvalidToken) {
+			log.Error("invalid token")
+			respondError(w, http.StatusUnauthorized, "invalid token")
+			return
+		}
+
+		log.Error("failed to refresh token", slog.String("error", err.Error()))
+		respondError(w, http.StatusInternalServerError, "failed to refresh token")
 		return
 	}
 
+	log.Info("token refreshed")
 	respondJSON(w, http.StatusOK, tokenPair)
 }
 

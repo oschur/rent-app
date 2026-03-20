@@ -1,10 +1,12 @@
 package auth
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
 	domain "rent-app/internal/domain/auth"
+	serviceAuth "rent-app/internal/service/auth"
 )
 
 type AuthService interface {
@@ -30,12 +32,11 @@ func AuthMiddleware(authService AuthService) func(http.Handler) http.Handler {
 
 			claims, err := authService.ValidateAccessToken(tokenString)
 			if err != nil {
-				errMsg := err.Error()
-				if errMsg == "token expired" {
+				if errors.Is(err, serviceAuth.ErrTokenExpired) {
 					http.Error(w, "token expired", http.StatusUnauthorized)
 					return
 				}
-				if errMsg == "invalid token type" {
+				if errors.Is(err, serviceAuth.ErrInvalidTokenType) {
 					http.Error(w, "invalid token type", http.StatusUnauthorized)
 					return
 				}

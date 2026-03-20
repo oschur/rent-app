@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	serviceAuth "rent-app/internal/service/auth"
 	"testing"
 
 	userContext "rent-app/internal/context"
@@ -87,7 +88,7 @@ func TestAuthMiddleware(t *testing.T) {
 			authHeader: "Bearer expired_token",
 			mockService: &MockAuthService{
 				ValidateAccessTokenFunc: func(tokenString string) (*domain.AccessTokenClaims, error) {
-					return nil, errors.New("token expired")
+					return nil, serviceAuth.ErrTokenExpired
 				},
 			},
 			expectedStatus: http.StatusUnauthorized,
@@ -98,7 +99,7 @@ func TestAuthMiddleware(t *testing.T) {
 			authHeader: "Bearer refresh_token_used_as_access",
 			mockService: &MockAuthService{
 				ValidateAccessTokenFunc: func(tokenString string) (*domain.AccessTokenClaims, error) {
-					return nil, errors.New("invalid token type")
+					return nil, serviceAuth.ErrInvalidTokenType
 				},
 			},
 			expectedStatus: http.StatusUnauthorized,
