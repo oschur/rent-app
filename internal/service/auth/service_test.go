@@ -528,6 +528,23 @@ func TestService_RefreshToken(t *testing.T) {
 		}
 	})
 
+	t.Run("handles repository error when blacklisting used token", func(t *testing.T) {
+		mockRepo := NewMockRefreshTokenRepository()
+		mockRepo.blacklistTokenErr = errors.New("database error")
+		service := NewService(mockRepo)
+
+		tokenPair, err := service.GenerateToken(1, false, false)
+		if err != nil {
+			t.Fatalf("failed to generate token: %v", err)
+		}
+
+		_, err = service.RefreshToken(tokenPair.RefreshToken)
+		if err == nil {
+			t.Error("expected error when blacklist fails, got nil")
+			return
+		}
+	})
+
 	t.Run("preserves user permissions in new tokens", func(t *testing.T) {
 		mockRepo := NewMockRefreshTokenRepository()
 		service := NewService(mockRepo)

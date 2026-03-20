@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"rent-app/internal/database"
 	domain "rent-app/internal/domain/user"
@@ -10,10 +11,12 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+const testDBAdvisoryLockKey = 424242
+
 func setupTestDB(t *testing.T) *PostgresRepo {
 	testDSN := os.Getenv("TEST_DB_DSN")
 	if testDSN == "" {
-		testDSN = "postgres://admin:admin@localhost:5432/users?sslmode=disable"
+		testDSN = "postgres://admin:admin@127.0.0.1:5432/users?sslmode=disable"
 	}
 
 	t.Helper()
@@ -21,6 +24,11 @@ func setupTestDB(t *testing.T) *PostgresRepo {
 	pool, err := database.Connect(ctx, testDSN)
 	if err != nil {
 		t.Fatalf("failed to connect test db: %v", err)
+	}
+
+	_, err = pool.Exec(ctx, fmt.Sprintf("SELECT pg_advisory_lock(%d)", testDBAdvisoryLockKey))
+	if err != nil {
+		t.Fatalf("failed to acquire test db advisory lock: %v", err)
 	}
 
 	stmt := `

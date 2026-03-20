@@ -2,6 +2,7 @@ package apartment
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"rent-app/internal/database"
 	"testing"
@@ -9,16 +10,46 @@ import (
 	domain "rent-app/internal/domain/apartment"
 )
 
+const testDBAdvisoryLockKey = 424242
+
 func setupTestDB(t *testing.T) *PostgresRepo {
 	testDSN := os.Getenv("TEST_DB_DSN")
 	if testDSN == "" {
-		testDSN = "postgres://admin:admin@localhost:5432/users?sslmode=disable"
+		testDSN = "postgres://admin:admin@127.0.0.1:5432/users?sslmode=disable"
 	}
 	t.Helper()
 	ctx := context.Background()
 	pool, err := database.Connect(ctx, testDSN)
 	if err != nil {
 		t.Fatalf("failed to connect test db: %v", err)
+	}
+
+	_, err = pool.Exec(ctx, fmt.Sprintf("SELECT pg_advisory_lock(%d)", testDBAdvisoryLockKey))
+	if err != nil {
+		t.Fatalf("failed to acquire test db advisory lock: %v", err)
+	}
+
+	stmtUsers := `
+		CREATE TABLE IF NOT EXISTS users (
+			id SERIAL PRIMARY KEY,
+			email VARCHAR(255) UNIQUE NOT NULL,
+			first_name VARCHAR(255) NOT NULL,
+			last_name VARCHAR(255) NOT NULL,
+			password_hash TEXT NOT NULL,
+			is_landlord BOOLEAN DEFAULT FALSE,
+			is_admin BOOLEAN DEFAULT FALSE,
+			created_at TIMESTAMP NOT NULL,
+			updated_at TIMESTAMP NOT NULL
+		)
+	`
+	_, err = pool.Exec(ctx, stmtUsers)
+	if err != nil {
+		t.Fatalf("failed to create users table: %v", err)
+	}
+
+	_, err = pool.Exec(ctx, "TRUNCATE users RESTART IDENTITY CASCADE")
+	if err != nil {
+		t.Fatalf("failed to truncate users: %v", err)
 	}
 
 	stmt := `
@@ -49,6 +80,22 @@ func setupTestDB(t *testing.T) *PostgresRepo {
 	_, err = pool.Exec(ctx, "TRUNCATE apartments RESTART IDENTITY CASCADE")
 	if err != nil {
 		t.Fatalf("failed to truncate apartments: %v", err)
+	}
+
+	_, err = pool.Exec(
+		ctx,
+		`
+		INSERT INTO users (
+			id, email, first_name, last_name, password_hash,
+			is_landlord, is_admin, created_at, updated_at
+		) VALUES (
+			1, 'owner@example.com', 'Owner', 'Test', 'hash',
+			FALSE, FALSE, NOW(), NOW()
+		)
+		`,
+	)
+	if err != nil {
+		t.Fatalf("failed to insert owner user: %v", err)
 	}
 
 	return &PostgresRepo{DB: pool}

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	domain "rent-app/internal/domain/auth"
+	serviceAuth "rent-app/internal/service/auth"
 	"testing"
 )
 
@@ -360,7 +361,7 @@ func TestHandler_Refresh(t *testing.T) {
 			}),
 			mockAuth: &MockAuthService{
 				RefreshTokenFunc: func(refreshToken string) (*domain.TokenPair, error) {
-					return nil, errors.New("token expired")
+					return nil, serviceAuth.ErrTokenExpired
 				},
 			},
 			mockAuthn:      &MockUserAuthenticator{},
@@ -383,7 +384,7 @@ func TestHandler_Refresh(t *testing.T) {
 			}),
 			mockAuth: &MockAuthService{
 				RefreshTokenFunc: func(refreshToken string) (*domain.TokenPair, error) {
-					return nil, errors.New("token has been revoked")
+					return nil, serviceAuth.ErrTokenBlacklisted
 				},
 			},
 			mockAuthn:      &MockUserAuthenticator{},
@@ -406,7 +407,7 @@ func TestHandler_Refresh(t *testing.T) {
 			}),
 			mockAuth: &MockAuthService{
 				RefreshTokenFunc: func(refreshToken string) (*domain.TokenPair, error) {
-					return nil, errors.New("invalid token type")
+					return nil, serviceAuth.ErrInvalidTokenType
 				},
 			},
 			mockAuthn:      &MockUserAuthenticator{},
@@ -429,7 +430,7 @@ func TestHandler_Refresh(t *testing.T) {
 			}),
 			mockAuth: &MockAuthService{
 				RefreshTokenFunc: func(refreshToken string) (*domain.TokenPair, error) {
-					return nil, errors.New("invalid token")
+					return nil, serviceAuth.ErrInvalidToken
 				},
 			},
 			mockAuthn:      &MockUserAuthenticator{},
@@ -442,6 +443,29 @@ func TestHandler_Refresh(t *testing.T) {
 
 				if response["error"] != "invalid token" {
 					t.Errorf("expected error 'invalid token', got %s", response["error"])
+				}
+			},
+		},
+		{
+			name: "internal refresh error",
+			requestBody: jsonBytes(map[string]string{
+				"refresh_token": "valid_refresh_token",
+			}),
+			mockAuth: &MockAuthService{
+				RefreshTokenFunc: func(refreshToken string) (*domain.TokenPair, error) {
+					return nil, errors.New("db unavailable")
+				},
+			},
+			mockAuthn:      &MockUserAuthenticator{},
+			expectedStatus: http.StatusInternalServerError,
+			validate: func(t *testing.T, rr *httptest.ResponseRecorder) {
+				var response map[string]string
+				if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
+					t.Fatalf("failed to unmarshal response: %v", err)
+				}
+
+				if response["error"] != "failed to refresh token" {
+					t.Errorf("expected error 'failed to refresh token', got %s", response["error"])
 				}
 			},
 		},
